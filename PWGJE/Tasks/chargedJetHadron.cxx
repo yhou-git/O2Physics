@@ -527,7 +527,7 @@ struct ChargedJetHadron {
         double dphi = track.phi() - jet.phi();
 	dphi = RecoDecay::constrainAngle(dphi, -o2::constants::math::PIHalf);
 	double dr = std::sqrt(deta * deta + dphi * dphi);
-        registry.fill(HIST("thn_jeth_correlations"), ptCorr, track.pt(), deta, dphi, dr);
+        registry.fill(HIST("thn_jeth_correlations"), ptCorr, track.pt(), deta, dphi, dr, eventWeight);
       }
     }
   }
@@ -552,7 +552,7 @@ struct ChargedJetHadron {
         }
         registry.fill(HIST("h_mixjeth_event_stats"), 2);
         double ptCorr = jet.pt() - jet.area() * c1.rho();
-        if (ptCorr < ptLeadingCorr) {
+        if (ptCorr < subleadingjetptMin) {
           continue;
         }
         registry.fill(HIST("h_mixjeth_event_stats"), 3);
@@ -565,7 +565,7 @@ struct ChargedJetHadron {
           double dphi = track.phi() - jet.phi();
           dphi = RecoDecay::constrainAngle(dphi, -o2::constants::math::PIHalf);
 	  double dr = std::sqrt(deta * deta + dphi * dphi);
-          registry.fill(HIST("thn_mixjeth_correlations"), ptCorr, track.pt(), deta, dphi, dr);
+          registry.fill(HIST("thn_mixjeth_correlations"), ptCorr, track.pt(), deta, dphi, dr, eventWeight);
         }
       }
     }
