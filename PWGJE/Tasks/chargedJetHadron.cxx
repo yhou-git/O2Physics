@@ -158,7 +158,7 @@ struct ChargedJetHadron {
       }
     }
 
-    if (doprocessQC || doprocessQCWeighted) {
+    if (doprocessTracksQC || doprocessTracksQCWeighted) {
       registry.add("h_track_pt", "track #it{p}_{T}; #it{p}_{T,track} (GeV/#it{c})", {HistType::kTH1F, {trackPtAxis}});
       registry.add("h2_track_eta_track_phi", "track #eta vs. track #phi; #eta; #phi; counts", {HistType::kTH2F, {etaAxis, phiAxis}});
       registry.add("h2_track_eta_pt", "track #eta vs. track #it{p}_{T}; #eta; #it{p}_{T,track} (GeV/#it{c}; counts", {HistType::kTH2F, {etaAxis, trackPtAxis}});
@@ -520,7 +520,16 @@ struct ChargedJetHadron {
     registry.fill(HIST("h2_track_eta_pt"), track.eta(), track.pt(), weight);
     registry.fill(HIST("h2_track_phi_pt"), track.phi(), track.pt(), weight);
   }
-
+/*
+  template <typename TParticles>
+  void fillParticleHistograms(const TParticles& particle, float weight = 1.0)
+  {
+    registry.fill(HIST("h_particle_pt"), particle.pt(), weight);
+    registry.fill(HIST("h2_particle_eta_particle_phi"), particle.eta(), particle.phi(), weight);
+    registry.fill(HIST("h2_particle_eta_pt"), particle.eta(), particle.pt(), weight);
+    registry.fill(HIST("h2_particle_phi_pt"), particle.phi(), particle.pt(), weight);
+  }
+*/
   //..........jet - hadron correlations..........................................
   template <typename TCollision, typename TJets, typename TTracks>
   void fillJetHadronHistograms(const TCollision& collision, const TJets& jets, const TTracks& tracks, float eventWeight = 1.0)
@@ -1106,7 +1115,7 @@ struct ChargedJetHadron {
   }
   PROCESS_SWITCH(ChargedJetHadron, processCollisionsWeighted, "weighted collsions for MCD", false);
 
-  void processQC(soa::Filtered<aod::JetCollisions>::iterator const& collision,
+  void processTracksQC(soa::Filtered<aod::JetCollisions>::iterator const& collision,
                  FilterJetTracks const& tracks)
   {
     if (!jetderiveddatautilities::selectCollision(collision, eventSelectionBits, skipMBGapEvents)) {
@@ -1122,9 +1131,9 @@ struct ChargedJetHadron {
       fillTrackHistograms(track);
     }
   }
-  PROCESS_SWITCH(ChargedJetHadron, processQC, "collisions and track QC for Data and MCD", false);
+  PROCESS_SWITCH(ChargedJetHadron, processTracksQC, "collisions and track QC for Data and MCD", false);
 
-  void processQCWeighted(soa::Join<aod::JetCollisions, aod::JMcCollisionLbs>::iterator const& collision,
+  void processTracksQCWeighted(soa::Join<aod::JetCollisions, aod::JMcCollisionLbs>::iterator const& collision,
                          aod::JetMcCollisions const&,
                          FilterJetTracks const& tracks)
   {
@@ -1145,7 +1154,7 @@ struct ChargedJetHadron {
       fillTrackHistograms(track, eventWeight);
     }
   }
-  PROCESS_SWITCH(ChargedJetHadron, processQCWeighted, "weighted collsions and tracks QC for MC", false);
+  PROCESS_SWITCH(ChargedJetHadron, processTracksQCWeighted, "weighted collsions and tracks QC for MCD", false);
 
   void processSpectraData(soa::Filtered<aod::JetCollisions>::iterator const& collision,
                           CorrChargedJets const& jets,
@@ -1519,6 +1528,9 @@ struct ChargedJetHadron {
     registry.fill(HIST("h_mcColl_counts_areasub"), 6.5);
     registry.fill(HIST("h_mcColl_rho"), mccollision.rho());
     registry.fill(HIST("h_mcColl_centrality"), centrality);
+    for (auto const& particle : particles) {
+     registry.fill(HIST("hPart3D"), particle.pt(), particle.eta(), particle.phi(), weight);
+    }
     for (auto const& jet : jets) {
       if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
         continue;
