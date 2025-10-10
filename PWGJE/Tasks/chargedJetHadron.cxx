@@ -23,16 +23,6 @@
 #include "PWGJE/DataModel/JetReducedData.h"
 #include "PWGJE/DataModel/JetSubtraction.h"
 
-#include "Framework/ASoA.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include <CommonConstants/MathConstants.h>
-#include <Framework/Configurable.h>
-#include <Framework/HistogramSpec.h>
-#include <Framework/InitContext.h>
-#include <Framework/OutputObjHeader.h> //refer-hfFF
-#include <Framework/runDataProcessing.h>
-
 #include "Common/CCDB/EventSelectionParams.h"
 #include "Common/Core/RecoDecay.h"
 #include "Common/DataModel/Centrality.h"
@@ -40,13 +30,22 @@
 #include "Common/DataModel/Multiplicity.h"
 #include "Common/DataModel/TrackSelectionTables.h"
 
+#include "Framework/ASoA.h"
+#include "Framework/AnalysisTask.h"
+#include "Framework/HistogramRegistry.h"
+#include <CommonConstants/MathConstants.h>
 #include <CommonConstants/PhysicsConstants.h>
 #include <Framework/ASoAHelpers.h>
 #include <Framework/AnalysisDataModel.h>
 #include <Framework/AnalysisHelpers.h>
 #include <Framework/BinningPolicy.h>
+#include <Framework/Configurable.h>
 #include <Framework/GroupedCombinations.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
 #include <Framework/O2DatabasePDGPlugin.h>
+#include <Framework/OutputObjHeader.h> //refer-hfFF
+#include <Framework/runDataProcessing.h>
 
 #include <THn.h>
 
@@ -108,7 +107,7 @@ struct ChargedJetHadron {
   ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0.0f, 15.0f, 25.0f, 35.0f, 50.0f}, "Mixing bins - multiplicity"}; // Julius Kinner photon-jet correlation analys
   ConfigurableAxis binsCentrality{"binsCentrality", {VARIABLE_WIDTH, 0.0, 10., 50, 100.}, "Mixing bins - centrality"};
 
-  Configurable<int> CentEstimator{"cfgCentEstimator", 0, "0:FT0C; 1:FT0A; 2:FT0M"};
+  Configurable<int> cfgCentEstimator{"cfgCentEstimator", 0, "0:FT0C; 1:FT0A; 2:FT0M"};
   // Filter ..................
   Filter trackCuts = (aod::jtrack::pt >= trackPtMin && aod::jtrack::pt < trackPtMax && aod::jtrack::eta > trackEtaMin && aod::jtrack::eta < trackEtaMax);
   Filter particleCuts = (aod::jmcparticle::pt >= trackPtMin && aod::jmcparticle::pt < trackPtMax && aod::jmcparticle::eta > trackEtaMin && aod::jmcparticle::eta < trackEtaMax);
@@ -191,7 +190,7 @@ struct ChargedJetHadron {
       registry.add("h_jet_area_rhoareasubtracted", "jet Area_{jet}; Area_{jet}; counts", {HistType::kTH1F, {{150, 0., 1.5}}});
       registry.add("h_jet_ntracks_rhoareasubtracted", "jet N_{jet tracks}; N_{jet, tracks; counts}", {HistType::kTH1F, {{200, -0.5, 199.5}}});
     }
-    
+
     if (doprocessJetHadronCorrelation || doprocessMixJetHadronCorrelation || doprocessJetHadronCorrelationMCD) {
       registry.add("thn_jeth_correlations", "jet-h correlations; jetpT; trackpT; jeth#Delta#eta; jeth#Delta#varphi; jeth#Delta#it{R}", HistType::kTHnSparseF, {jetPtAxisRhoAreaSub, trackPtAxis, detaAxis, dphiAxis, drAxis});
       registry.add("thn_mixjeth_correlations", "ME: jet-h correlations; jetpT; trackpT; jeth#Delta#eta; jeth#Delta#varphi; jeth#Delta#it{R}", HistType::kTHnSparseF, {jetPtAxisRhoAreaSub, trackPtAxis, detaAxis, dphiAxis, drAxis});
@@ -222,34 +221,34 @@ struct ChargedJetHadron {
 
     //========jet-hadron correlations======================
     if (doprocessLeadingJetHadronCorrelation || doprocessSpectraAreaSubMCD) {
-    registry.add("h_centrality", "centrality distributions; centrality; counts", {HistType::kTH1F, {centralityAxis}});
-    registry.add("h_inclusivejet_corrpt", "inclusive jet pT;#it{p}_{T,jet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxisRhoAreaSub}});
-    registry.add("h_dijet_pair_counts", "number of paris with good leading-subleading jets; jet pairs; counts", {HistType::kTH1F, {{10, 0, 10}}});
-    registry.add("h_dijet_pair_counts_cut", "number of pairs with leadingjet & subleadingjet cut pair; jet pairs; counts", {HistType::kTH1F, {{10, 0, 10}}});
-    registry.add("h_leadjet_pt", "leading jet pT;#it{p}_{T,leadingjet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxis}});
-    registry.add("h_leadjet_corrpt", "leading jet corrpT;#it{p}_{T,leadingjet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxisRhoAreaSub}});
-    registry.add("h_subleadjet_pt", "subleading jet pT;#it{p}_{T,subleadingjet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxis}});
-    registry.add("h_subleadjet_corrpt", "subleading jet corrpT;#it{p}_{T,leadingjet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxisRhoAreaSub}});
-    registry.add("h_dijet_dphi", "dijet #Delta#varphi before converted to 0-2pi; #Delta#varphi; counts", {HistType::kTH1F, {{126, -6.3, 6.3}}});
-    registry.add("h_leadjet_eta", "leading jet eta;#eta; counts", {HistType::kTH1F, {etaAxis}});
-    registry.add("h_leadjet_phi", "leading jet phi;#phi; counts", {HistType::kTH1F, {phiAxis}});
-    registry.add("h_subleadjet_eta", "subleading jet eta;#eta; counts", {HistType::kTH1F, {etaAxis}});
-    registry.add("h_subleadjet_phi", "subleading jet phi;#phi; counts", {HistType::kTH1F, {phiAxis}});
-    registry.add("h2_dijet_detanoflip_dphi", "dijet #Delta#eta no flip vs #Delta#varphi; #Delta#eta_{noflip}; #Delta#varphi; counts", {HistType::kTH2F, {detaAxis, {63, 0, 6.3}}});
-    registry.add("h2_dijet_deta_dphi", "dijet #Delta#eta flip vs #Delta#varphi; #Delta#eta_{flip}; #Delta#varphi; counts", {HistType::kTH2F, {detaAxis, {63, 0, 6.3}}});
-    registry.add("h2_dijet_Asymmetry", "dijet Asymmetry; #it{p}_{T,subleadingjet} (GeV/#it{c}); #it{X}_{J}; counts", {HistType::kTH2F, {jetPtAxisRhoAreaSub, {40, 0, 1.0}}});
+      registry.add("h_centrality", "centrality distributions; centrality; counts", {HistType::kTH1F, {centralityAxis}});
+      registry.add("h_inclusivejet_corrpt", "inclusive jet pT;#it{p}_{T,jet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxisRhoAreaSub}});
+      registry.add("h_dijet_pair_counts", "number of paris with good leading-subleading jets; jet pairs; counts", {HistType::kTH1F, {{10, 0, 10}}});
+      registry.add("h_dijet_pair_counts_cut", "number of pairs with leadingjet & subleadingjet cut pair; jet pairs; counts", {HistType::kTH1F, {{10, 0, 10}}});
+      registry.add("h_leadjet_pt", "leading jet pT;#it{p}_{T,leadingjet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxis}});
+      registry.add("h_leadjet_corrpt", "leading jet corrpT;#it{p}_{T,leadingjet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxisRhoAreaSub}});
+      registry.add("h_subleadjet_pt", "subleading jet pT;#it{p}_{T,subleadingjet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxis}});
+      registry.add("h_subleadjet_corrpt", "subleading jet corrpT;#it{p}_{T,leadingjet} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxisRhoAreaSub}});
+      registry.add("h_dijet_dphi", "dijet #Delta#varphi before converted to 0-2pi; #Delta#varphi; counts", {HistType::kTH1F, {{126, -6.3, 6.3}}});
+      registry.add("h_leadjet_eta", "leading jet eta;#eta; counts", {HistType::kTH1F, {etaAxis}});
+      registry.add("h_leadjet_phi", "leading jet phi;#phi; counts", {HistType::kTH1F, {phiAxis}});
+      registry.add("h_subleadjet_eta", "subleading jet eta;#eta; counts", {HistType::kTH1F, {etaAxis}});
+      registry.add("h_subleadjet_phi", "subleading jet phi;#phi; counts", {HistType::kTH1F, {phiAxis}});
+      registry.add("h2_dijet_detanoflip_dphi", "dijet #Delta#eta no flip vs #Delta#varphi; #Delta#eta_{noflip}; #Delta#varphi; counts", {HistType::kTH2F, {detaAxis, {63, 0, 6.3}}});
+      registry.add("h2_dijet_deta_dphi", "dijet #Delta#eta flip vs #Delta#varphi; #Delta#eta_{flip}; #Delta#varphi; counts", {HistType::kTH2F, {detaAxis, {63, 0, 6.3}}});
+      registry.add("h2_dijet_Asymmetry", "dijet Asymmetry; #it{p}_{T,subleadingjet} (GeV/#it{c}); #it{X}_{J}; counts", {HistType::kTH2F, {jetPtAxisRhoAreaSub, {40, 0, 1.0}}});
 
-    registry.add("h_jeth_detatot", "jet-hadron tot #Delta#eta;#Delta#eta; counts", {HistType::kTH1F, {detaAxis}});
-    registry.add("h_jeth_deta", "jet-hadron #Delta#eta;#Delta#eta; counts", {HistType::kTH1F, {detaAxis}});
-    registry.add("h_jeth_dphi", "jet-hadron #Delta#varphi;#Delta#varphi; counts", {HistType::kTH1F, {dphiAxis}});
-    registry.add("h2_jeth_detatot_dphi", "jeth deta vs dphi with physical cuts; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
-    registry.add("h2_jeth_deta_dphi", "jeth deta vs dphi; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
-    registry.add("h2_jeth_physicalcutsup_deta_dphi", "jeth deta vs dphi with physical cuts |#Delta#eta_{jet1,2}| > 1.0; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
-    registry.add("h2_jeth_physicalcutsmd_deta_dphi", "jeth deta vs dphi with physical cuts |#Delta#eta_{jet1,2}| #in (0.5, 1.0); #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
-    registry.add("h2_jeth_physicalcutsdw_deta_dphi", "jeth deta vs dphi with physical cuts  |#Delta#eta_{jet1,2}| < 0.5; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
-    registry.add("h2_jeth_physicalcutsHup_deta_dphi", "jeth deta vs dphi with physical cuts |#Delta#eta_{jet1,2}| > 0.5,#Delta#eta_{jet2}>0; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
-    registry.add("h2_jeth_physicalcutsHdw_deta_dphi", "jeth deta vs dphi with physical cuts |#Delta#eta_{jet1,2}| < 0.5 #Delta#eta_{jet2}>0; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
-    registry.add("thn_jethadron_correlations", "jet-h correlations; leadingjetpT; subleadingjetpT; trackpT; no flip jeth#Delta#eta; #Delta#eta_{jet1,2}; jeth#Delta#eta; jeth#Delta#varphi", HistType::kTHnSparseF, {jetPtAxisRhoAreaSub, jetPtAxisRhoAreaSub, trackPtAxis, detaAxis, detaAxis, detaAxis, dphiAxis});
+      registry.add("h_jeth_detatot", "jet-hadron tot #Delta#eta;#Delta#eta; counts", {HistType::kTH1F, {detaAxis}});
+      registry.add("h_jeth_deta", "jet-hadron #Delta#eta;#Delta#eta; counts", {HistType::kTH1F, {detaAxis}});
+      registry.add("h_jeth_dphi", "jet-hadron #Delta#varphi;#Delta#varphi; counts", {HistType::kTH1F, {dphiAxis}});
+      registry.add("h2_jeth_detatot_dphi", "jeth deta vs dphi with physical cuts; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
+      registry.add("h2_jeth_deta_dphi", "jeth deta vs dphi; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
+      registry.add("h2_jeth_physicalcutsup_deta_dphi", "jeth deta vs dphi with physical cuts |#Delta#eta_{jet1,2}| > 1.0; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
+      registry.add("h2_jeth_physicalcutsmd_deta_dphi", "jeth deta vs dphi with physical cuts |#Delta#eta_{jet1,2}| #in (0.5, 1.0); #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
+      registry.add("h2_jeth_physicalcutsdw_deta_dphi", "jeth deta vs dphi with physical cuts  |#Delta#eta_{jet1,2}| < 0.5; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
+      registry.add("h2_jeth_physicalcutsHup_deta_dphi", "jeth deta vs dphi with physical cuts |#Delta#eta_{jet1,2}| > 0.5,#Delta#eta_{jet2}>0; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
+      registry.add("h2_jeth_physicalcutsHdw_deta_dphi", "jeth deta vs dphi with physical cuts |#Delta#eta_{jet1,2}| < 0.5 #Delta#eta_{jet2}>0; #Delta#eta; #Delta#phi", {HistType::kTH2F, {detaAxis, dphiAxis}});
+      registry.add("thn_jethadron_correlations", "jet-h correlations; leadingjetpT; subleadingjetpT; trackpT; no flip jeth#Delta#eta; #Delta#eta_{jet1,2}; jeth#Delta#eta; jeth#Delta#varphi", HistType::kTHnSparseF, {jetPtAxisRhoAreaSub, jetPtAxisRhoAreaSub, trackPtAxis, detaAxis, detaAxis, detaAxis, dphiAxis});
     }
 
     if (doprocessMixLeadingJetHadronCorrelation || doprocessSpectraAreaSubMCD) {
@@ -566,8 +565,8 @@ struct ChargedJetHadron {
         registry.fill(HIST("h_jeth_event_stats"), 5);
         double deta = track.eta() - jet.eta();
         double dphi = track.phi() - jet.phi();
-	dphi = RecoDecay::constrainAngle(dphi, -o2::constants::math::PIHalf);
-	double dr = std::sqrt(deta * deta + dphi * dphi);
+        dphi = RecoDecay::constrainAngle(dphi, -o2::constants::math::PIHalf);
+        double dr = std::sqrt(deta * deta + dphi * dphi);
         registry.fill(HIST("thn_jeth_correlations"), ptCorr, track.pt(), deta, dphi, dr, eventWeight);
       }
     }
@@ -582,7 +581,7 @@ struct ChargedJetHadron {
 
     for (const auto& [c1, jets1, c2, tracks2] : pairData) {
       registry.fill(HIST("h_mixjeth_event_stats"), 1);
-      //int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), c2.multFT0M()));
+      // int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), c2.multFT0M()));
 
       for (auto const& jet : jets1) {
         if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
@@ -605,7 +604,7 @@ struct ChargedJetHadron {
           double deta = track.eta() - jet.eta();
           double dphi = track.phi() - jet.phi();
           dphi = RecoDecay::constrainAngle(dphi, -o2::constants::math::PIHalf);
-	  double dr = std::sqrt(deta * deta + dphi * dphi);
+          double dr = std::sqrt(deta * deta + dphi * dphi);
           registry.fill(HIST("thn_mixjeth_correlations"), ptCorr, track.pt(), deta, dphi, dr, eventWeight);
         }
       }
@@ -634,7 +633,7 @@ struct ChargedJetHadron {
         double deta = particle.eta() - jet.eta();
         double dphi = particle.phi() - jet.phi();
         dphi = RecoDecay::constrainAngle(dphi, -o2::constants::math::PIHalf);
-	double dr = std::sqrt(deta * deta + dphi * dphi);
+        double dr = std::sqrt(deta * deta + dphi * dphi);
         registry.fill(HIST("thn_jeth_correlations_part"), ptCorr, particle.pt(), deta, dphi, dr, eventWeight);
       }
     }
@@ -660,7 +659,7 @@ struct ChargedJetHadron {
 
         double ptCorr = jet.pt() - jet.area() * c1.rho();
         if (ptCorr < subleadingjetptMin)
-           continue;
+          continue;
         registry.fill(HIST("h_mixmcjeth_event_stats"), 3);
 
         for (auto const& particle : particles2) {
@@ -669,7 +668,7 @@ struct ChargedJetHadron {
           double deta = particle.eta() - jet.eta();
           double dphi = particle.phi() - jet.phi();
           dphi = RecoDecay::constrainAngle(dphi, -o2::constants::math::PIHalf);
-	  double dr = std::sqrt(deta * deta + dphi * dphi);
+          double dr = std::sqrt(deta * deta + dphi * dphi);
           registry.fill(HIST("thn_mixmcjeth_correlations"), ptCorr, particle.pt(), deta, dphi, dr, eventWeight);
         }
       }
@@ -770,10 +769,10 @@ struct ChargedJetHadron {
             registry.fill(HIST("h2_jeth_physicalcutsmd_deta_dphi"), deta, dphi, eventWeight);
           if (std::abs(deltaEtaJets) < etaGapdw)
             registry.fill(HIST("h2_jeth_physicalcutsdw_deta_dphi"), deta, dphi, eventWeight);
-          if(etaJet1Raw > etaJet2Raw && std::abs(deltaEtaJets) >= etaGapup)
-	    registry.fill(HIST("h2_jeth_physicalcutsHup_deta_dphi"), deta, dphi, eventWeight); //Dr.Yang
-          if(etaJet1Raw > etaJet2Raw && std::abs(deltaEtaJets) < etaGapdw)
-	    registry.fill(HIST("h2_jeth_physicalcutsHdw_deta_dphi"), deta, dphi, eventWeight);//Dr.Yang
+          if (etaJet1Raw > etaJet2Raw && std::abs(deltaEtaJets) >= etaGapup)
+            registry.fill(HIST("h2_jeth_physicalcutsHup_deta_dphi"), deta, dphi, eventWeight); // Dr.Yang
+          if (etaJet1Raw > etaJet2Raw && std::abs(deltaEtaJets) < etaGapdw)
+            registry.fill(HIST("h2_jeth_physicalcutsHdw_deta_dphi"), deta, dphi, eventWeight); // Dr.Yang
         }
       }
     }
@@ -1128,7 +1127,7 @@ struct ChargedJetHadron {
   PROCESS_SWITCH(ChargedJetHadron, processCollisionsWeighted, "weighted collsions for MCD", false);
 
   void processTracksQC(soa::Filtered<aod::JetCollisions>::iterator const& collision,
-                 FilterJetTracks const& tracks)
+                       FilterJetTracks const& tracks)
   {
     if (!jetderiveddatautilities::selectCollision(collision, eventSelectionBits, skipMBGapEvents)) {
       return;
@@ -1146,8 +1145,8 @@ struct ChargedJetHadron {
   PROCESS_SWITCH(ChargedJetHadron, processTracksQC, "collisions and track QC for Data and MCD", false);
 
   void processTracksQCWeighted(soa::Join<aod::JetCollisions, aod::JMcCollisionLbs>::iterator const& collision,
-                         aod::JetMcCollisions const&,
-                         FilterJetTracks const& tracks)
+                               aod::JetMcCollisions const&,
+                               FilterJetTracks const& tracks)
   {
     float eventWeight = collision.weight();
     if (!jetderiveddatautilities::selectCollision(collision, eventSelectionBits, skipMBGapEvents)) {
@@ -1264,9 +1263,35 @@ struct ChargedJetHadron {
   }
   PROCESS_SWITCH(ChargedJetHadron, processMixJetHadronCorrelation, "jet-h mixed event correlation for Data", false);
 
+  void processJetHadronCorrelationMCD(FilterCollision const& collision,
+                                      FilterCollisions const& collisions,
+                                      CorrChargedMCDJets const& jets,
+                                      FilterJetTracks const& tracks)
+  {
+    if (!jetderiveddatautilities::selectCollision(collision, eventSelectionBits, skipMBGapEvents)) {
+      return;
+    }
+    if (collision.trackOccupancyInTimeRange() < trackOccupancyInTimeRangeMin || trackOccupancyInTimeRangeMax < collision.trackOccupancyInTimeRange()) {
+      return;
+    }
+    for (auto const& jet : jets) {
+      if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
+        continue;
+      }
+      if (!isAcceptedJet<aod::JetTracks>(jet)) {
+        continue;
+      }
+      fillJetAreaSubHistograms(jet, collision.rho());
+    }
+    fillJetHadronHistograms(collision, jets, tracks);
+    fillMixJetHadronHistograms(collisions, jets, tracks);
+  }
+  PROCESS_SWITCH(ChargedJetHadron, processJetHadronCorrelationMCD, "jet-hadron correlations for MCD", false);
+
+  //////////////////////////////////////
   void processLeadingJetHadronCorrelation(FilterCollision const& collision,
-                                   CorrChargedJets const& jets,
-                                   FilterJetTracks const& tracks)
+                                          CorrChargedJets const& jets,
+                                          FilterJetTracks const& tracks)
   {
     if (!jetderiveddatautilities::selectCollision(collision, eventSelectionBits, skipMBGapEvents)) {
       return;
@@ -1279,8 +1304,8 @@ struct ChargedJetHadron {
   PROCESS_SWITCH(ChargedJetHadron, processLeadingJetHadronCorrelation, "leadingjet-h for Data", false);
 
   void processMixLeadingJetHadronCorrelation(FilterCollisions const& collisions,
-                                      CorrChargedJets const& jets,
-                                      FilterJetTracks const& tracks)
+                                             CorrChargedJets const& jets,
+                                             FilterJetTracks const& tracks)
   {
     for (auto const& collision : collisions) {
       if (!jetderiveddatautilities::selectCollision(collision, eventSelectionBits, skipMBGapEvents)) {
@@ -1332,32 +1357,6 @@ struct ChargedJetHadron {
     }
   }
   PROCESS_SWITCH(ChargedJetHadron, processHFJetCorrelation, "D0-jet for Data", false);
-
-  //////////////////////////////////////
-  void processJetHadronCorrelationMCD(FilterCollision const& collision,
-                                      FilterCollisions const& collisions,
-                                      CorrChargedMCDJets const& jets,
-                                      FilterJetTracks const& tracks)
-  {
-    if (!jetderiveddatautilities::selectCollision(collision, eventSelectionBits, skipMBGapEvents)) {
-      return;
-    }
-    if (collision.trackOccupancyInTimeRange() < trackOccupancyInTimeRangeMin || trackOccupancyInTimeRangeMax < collision.trackOccupancyInTimeRange()) {
-      return;
-    }
-    for (auto const& jet : jets) {
-      if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
-        continue;
-      }
-      if (!isAcceptedJet<aod::JetTracks>(jet)) {
-        continue;
-      }
-      fillJetAreaSubHistograms(jet, collision.rho());
-    }
-    fillJetHadronHistograms(collision, jets, tracks);
-    fillMixJetHadronHistograms(collisions, jets, tracks);
-  }
-  PROCESS_SWITCH(ChargedJetHadron, processJetHadronCorrelationMCD, "jet-hadron correlations for MCD", false);
 
   void processSpectraAreaSubMCD(FilterCollision const& collision,
                                 FilterCollisions const& collisions,
@@ -1475,8 +1474,8 @@ struct ChargedJetHadron {
                                 // McParticleCollision const& mccollisions,
                                 soa::SmallGroups<aod::JetCollisionsMCD> const& collisions,
                                 CorrChargedMCPJets const& jets,
-	                        soa::Filtered<aod::JetParticles> const& particles)
-                                //aod::JetParticles const& particles // need to check 20250915
+                                soa::Filtered<aod::JetParticles> const& particles)
+  // aod::JetParticles const& particles // need to check 20250915
   {
     bool mcLevelIsParticleLevel = true;
     bool hasSel8Coll = false;
@@ -1554,8 +1553,8 @@ struct ChargedJetHadron {
     }
     fillMCPJetHadronHistograms(mccollision, jets, particles);
     fillMCPLeadingJetHadronHistograms(mccollision, jets, particles);
-    //fillMCPMixJetHadronHistograms(collisions, jets, particles); //MCP mixed problem: error: no matching function for call to 'o2::aod::mult::MultNTracksGlobal::MultNTracksGlobal()
-    //fillMCPMixLeadingJetHadronHistograms(collisions, jets, particles);
+    // fillMCPMixJetHadronHistograms(collisions, jets, particles); //MCP mixed problem: error: no matching function for call to 'o2::aod::mult::MultNTracksGlobal::MultNTracksGlobal()
+    // fillMCPMixLeadingJetHadronHistograms(collisions, jets, particles);
   }
   PROCESS_SWITCH(ChargedJetHadron, processSpectraAreaSubMCP, "jet spectra with area-based subtraction for MC particle level", false);
 
