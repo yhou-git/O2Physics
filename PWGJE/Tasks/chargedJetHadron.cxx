@@ -1334,7 +1334,7 @@ struct ChargedJetHadron {
     }
     fillJetHadronHistograms(collision, jets, tracks);
     fillLeadingJetHadronHistograms(collision, jets, tracks);
-    fillMixJetHadronHistograms(collision, jets, tracks);
+    //fillMixJetHadronHistograms(collision, jets, tracks);
     fillMixLeadingJetHadronHistograms(collisions, jets, tracks);
   }
   PROCESS_SWITCH(ChargedJetHadron, processSpectraAreaSubMCD, "jet spectra with rho-area subtraction for MCD", false);
