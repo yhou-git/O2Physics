@@ -129,6 +129,12 @@ struct ChargedJetHadron {
   std::vector<int> eventSelectionBits;
   int trackSelection = -1;
 
+  enum AcceptSplitCollisionsOptions {
+    NonSplitOnly = 0,
+    SplitOkCheckAnyAssocColl,      // 1
+    SplitOkCheckFirstAssocCollOnly // 2
+  };
+
   void init(o2::framework::InitContext&)
   {
     eventSelectionBits = jetderiveddatautilities::initialiseEventSelectionBits(static_cast<std::string>(eventSelections));
@@ -1473,6 +1479,10 @@ struct ChargedJetHadron {
                                 //aod::JetParticles const& particles // need to check 20250915
   {
     bool mcLevelIsParticleLevel = true;
+    bool hasSel8Coll = false;
+    bool centralityIsGood = false;
+    bool occupancyIsGood = false;
+    float centrality = -999.0;
 
     registry.fill(HIST("h_mcColl_counts_areasub"), 0.5);
     if (std::abs(mccollision.posZ()) > vertexZCut) {
@@ -1483,17 +1493,12 @@ struct ChargedJetHadron {
       return;
     }
     registry.fill(HIST("h_mcColl_counts_areasub"), 2.5);
-    if (acceptSplitCollisions == 0 && collisions.size() > 1) {
+    if (acceptSplitCollisions == NonSplitOnly && collisions.size() > 1) {
       return;
     }
     registry.fill(HIST("h_mcColl_counts_areasub"), 3.5);
 
-    bool hasSel8Coll = false;
-    bool centralityIsGood = false;
-    bool occupancyIsGood = false;
-    float centrality = -999.0;
-    int recoCollision = 2;
-    if (acceptSplitCollisions == recoCollision) {
+    if (acceptSplitCollisions == SplitOkCheckFirstAssocCollOnly || acceptSplitCollisions == NonSplitOnly) {
       centrality = collisions.begin().centFT0M();
       if (jetderiveddatautilities::selectCollision(collisions.begin(), eventSelectionBits, skipMBGapEvents)) {
         hasSel8Coll = true;
