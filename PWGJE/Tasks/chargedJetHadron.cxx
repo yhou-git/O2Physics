@@ -560,7 +560,7 @@ struct ChargedJetHadron {
 
     for (const auto& [c1, jets1, c2, tracks2] : pairData) {
       registry.fill(HIST("h_mixjeth_event_stats"), 1);
-      int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), c2.multFT0M()));
+      //int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), c2.multFT0M()));
 
       for (auto const& jet : jets1) {
         if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
@@ -961,7 +961,7 @@ struct ChargedJetHadron {
 
   //.....MCP..mixed events.................................
   template <typename TmcCollisions, typename TJets, typename TParticles>
-  void fillMCPMixJetHadronHistograms(const TmcCollisions& mcCollisions, const TJets& jets, const TParticles& particles, float eventWeight = 1.0)
+  void fillMCPMixLeadingJetHadronHistograms(const TmcCollisions& mcCollisions, const TJets& jets, const TParticles& particles, float eventWeight = 1.0)
   {
     auto particlesTuple = std::make_tuple(jets, particles);
     Pair<TmcCollisions, TJets, TParticles, BinningTypeMC> pairMCData{corrBinningMC, numberEventsMixed, -1, mcCollisions, particlesTuple, &cache};
@@ -1334,6 +1334,7 @@ struct ChargedJetHadron {
     }
     fillJetHadronHistograms(collision, jets, tracks);
     fillLeadingJetHadronHistograms(collision, jets, tracks);
+    fillMixJetHadronHistograms(collision, jets, tracks);
     fillMixLeadingJetHadronHistograms(collisions, jets, tracks);
   }
   PROCESS_SWITCH(ChargedJetHadron, processSpectraAreaSubMCD, "jet spectra with rho-area subtraction for MCD", false);
@@ -1504,6 +1505,7 @@ struct ChargedJetHadron {
     }
     fillMCPJetHadronHistograms(mccollision, jets, particles);
     fillMCPLeadingJetHadronHistograms(mccollision, jets, particles);
+    //fillMCPMixJetHadronHistograms(collisions, jets, particles);
     //fillMCPMixLeadingJetHadronHistograms(collisions, jets, particles);
   }
   PROCESS_SWITCH(ChargedJetHadron, processSpectraAreaSubMCP, "jet spectra with area-based subtraction for MC particle level", false);
