@@ -315,6 +315,12 @@ struct ChargedJetHadron {
 
       registry.add("h_mcColl_rho", "mc collision rho;#rho (GeV/#it{c}); counts", {HistType::kTH1F, {{500, 0.0, 500.0}}});
       registry.add("h_mcColl_centrality", "mc collision centrality; centrality; counts", {HistType::kTH1F, {centralityAxis}});
+
+      registry.add("h_particle_pt", "particle #it{p}_{T}; #it{p}_{T,particle} (GeV/#it{c})", {HistType::kTH1F, {trackPtAxis}});
+      registry.add("h2_particle_eta_particle_phi", "particle #eta vs. particle #phi; #eta; #phi; counts", {HistType::kTH2F, {etaAxis, phiAxis}});
+      registry.add("h2_particle_eta_pt", "particle #eta vs. particle #it{p}_{T}; #eta; #it{p}_{T,particle} (GeV/#it{c}; counts", {HistType::kTH2F, {etaAxis, trackPtAxis}});
+      registry.add("h2_particle_phi_pt", "particle #phi vs. particle #it{p}_{T}; #phi; #it{p}_{T,particle} (GeV/#it{c}; counts", {HistType::kTH2F, {phiAxis, trackPtAxis}});
+
       registry.add("h_jet_pt_part_rhoareasubtracted", "part jet corr pT;#it{p}_{T,jet}^{part} (GeV/#it{c}); counts", {HistType::kTH1F, {jetPtAxisRhoAreaSub}});
       registry.add("h_jet_eta_part_rhoareasubtracted", "part jet #eta;#eta^{part}; counts", {HistType::kTH1F, {etaAxis}});
       registry.add("h_jet_phi_part_rhoareasubtracted", "part jet #varphi;#varphi^{part}; counts", {HistType::kTH1F, {phiAxis}});
@@ -520,7 +526,7 @@ struct ChargedJetHadron {
     registry.fill(HIST("h2_track_eta_pt"), track.eta(), track.pt(), weight);
     registry.fill(HIST("h2_track_phi_pt"), track.phi(), track.pt(), weight);
   }
-/*
+
   template <typename TParticles>
   void fillParticleHistograms(const TParticles& particle, float weight = 1.0)
   {
@@ -529,7 +535,7 @@ struct ChargedJetHadron {
     registry.fill(HIST("h2_particle_eta_pt"), particle.eta(), particle.pt(), weight);
     registry.fill(HIST("h2_particle_phi_pt"), particle.phi(), particle.pt(), weight);
   }
-*/
+
   //..........jet - hadron correlations..........................................
   template <typename TCollision, typename TJets, typename TTracks>
   void fillJetHadronHistograms(const TCollision& collision, const TJets& jets, const TTracks& tracks, float eventWeight = 1.0)
@@ -1529,7 +1535,7 @@ struct ChargedJetHadron {
     registry.fill(HIST("h_mcColl_rho"), mccollision.rho());
     registry.fill(HIST("h_mcColl_centrality"), centrality);
     for (auto const& particle : particles) {
-     registry.fill(HIST("hPart3D"), particle.pt(), particle.eta(), particle.phi(), weight);
+      fillParticleHistograms(particle);
     }
     for (auto const& jet : jets) {
       if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
