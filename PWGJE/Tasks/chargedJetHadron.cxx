@@ -1539,6 +1539,7 @@ struct ChargedJetHadron {
     registry.fill(HIST("h_mcColl_counts_areasub"), 6.5);
     registry.fill(HIST("h_mcColl_rho"), mccollision.rho());
     registry.fill(HIST("h_mcColl_centrality"), centrality);
+    // particle QA...........
     for (auto const& particle : particles) {
       fillParticleHistograms(particle);
     }
