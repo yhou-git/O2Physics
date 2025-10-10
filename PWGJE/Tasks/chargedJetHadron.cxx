@@ -111,6 +111,7 @@ struct ChargedJetHadron {
   Configurable<int> CentEstimator{"cfgCentEstimator", 0, "0:FT0C; 1:FT0A; 2:FT0M"};
   // Filter ..................
   Filter trackCuts = (aod::jtrack::pt >= trackPtMin && aod::jtrack::pt < trackPtMax && aod::jtrack::eta > trackEtaMin && aod::jtrack::eta < trackEtaMax);
+  Filter particleCuts = (aod::jmcparticle::pt >= trackPtMin && aod::jmcparticle::pt < trackPtMax && aod::jmcparticle::eta > trackEtaMin && aod::jmcparticle::eta < trackEtaMax);
   Filter eventCuts = (nabs(aod::jcollision::posZ) < vertexZCut && aod::jcollision::centFT0M >= centralityMin && aod::jcollision::centFT0M < centralityMax); // 20250814 and collision.centrality-> collision.centFT0M
 
   SliceCache cache;
@@ -1453,7 +1454,8 @@ struct ChargedJetHadron {
                                 // McParticleCollision const& mccollisions,
                                 soa::SmallGroups<aod::JetCollisionsMCD> const& collisions,
                                 CorrChargedMCPJets const& jets,
-                                aod::JetParticles const& particles) // need to check 20250915
+	                        soa::Filtered<aod::JetParticles> const& particles)
+                                //aod::JetParticles const& particles // need to check 20250915
   {
     bool mcLevelIsParticleLevel = true;
 
@@ -1528,7 +1530,7 @@ struct ChargedJetHadron {
     }
     fillMCPJetHadronHistograms(mccollision, jets, particles);
     fillMCPLeadingJetHadronHistograms(mccollision, jets, particles);
-    fillMCPMixJetHadronHistograms(collisions, jets, particles);
+    //fillMCPMixJetHadronHistograms(collisions, jets, particles); //MCP mixed problem: error: no matching function for call to 'o2::aod::mult::MultNTracksGlobal::MultNTracksGlobal()
     //fillMCPMixLeadingJetHadronHistograms(collisions, jets, particles);
   }
   PROCESS_SWITCH(ChargedJetHadron, processSpectraAreaSubMCP, "jet spectra with area-based subtraction for MC particle level", false);
