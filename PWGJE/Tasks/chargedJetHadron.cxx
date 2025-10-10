@@ -1528,7 +1528,7 @@ struct ChargedJetHadron {
     }
     fillMCPJetHadronHistograms(mccollision, jets, particles);
     fillMCPLeadingJetHadronHistograms(mccollision, jets, particles);
-    //fillMCPMixJetHadronHistograms(collisions, jets, particles);
+    fillMCPMixJetHadronHistograms(collisions, jets, particles);
     //fillMCPMixLeadingJetHadronHistograms(collisions, jets, particles);
   }
   PROCESS_SWITCH(ChargedJetHadron, processSpectraAreaSubMCP, "jet spectra with area-based subtraction for MC particle level", false);
