@@ -149,7 +149,7 @@ struct ChargedJetHadron {
     AxisSpec dphiAxis = {140, -1.7, 5.3, "#Delta#varphi"};
     AxisSpec dphijetAxis = {160, -1.7, 6.3, "#Delta#varphi"};
     AxisSpec detaAxis = {170, -1.7, 1.7, "#Delta#eta"};
-    AxisSpec drAxis = {110, -1.1, 1.1, "#Delta#it{R}"};
+    AxisSpec drAxis = {250, 0.0, 5.0, "#Delta#it{R}"};
 
     if (doprocessCollisions || doprocessCollisionsWeighted) {
       registry.add("h_collisions", "event status;event status; entries", {HistType::kTH1F, {{4, 0.0, 4.0}}});
