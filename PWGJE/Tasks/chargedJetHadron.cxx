@@ -549,7 +549,11 @@ struct ChargedJetHadron {
       if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
         continue;
       }
-      if (!isAcceptedJet<aod::JetTracks>(jet)) {
+      //if (!isAcceptedJet<aod::JetTracks>(jet)) {
+      //  continue;
+      //}
+      using TracksTable = std::decay_t<decltype(tracks)>;
+      if (!isAcceptedJet<TracksTable>(jet)) {
         continue;
       }
       registry.fill(HIST("h_jeth_event_stats"), 2);
@@ -1283,9 +1287,13 @@ struct ChargedJetHadron {
       if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
         continue;
       }
-      if (!isAcceptedJet<aod::JetTracks>(jet)) {
+      using TracksTable = std::decay_t<decltype(tracks)>;
+      if (!isAcceptedJet<TracksTable>(jet)) {
         continue;
       }
+      //if (!isAcceptedJet<aod::JetTracks>(jet)) {
+      //  continue;
+      //}
       fillJetAreaSubHistograms(jet, collision.rho());
     }
     fillJetHadronHistograms(collision, jets, tracks);
@@ -1326,6 +1334,10 @@ struct ChargedJetHadron {
     if (!hasValidCollision) {
       return;
     }
+/*    for (auto const& collision : collisions) {
+       fillLeadingJetHadronHistograms(collision, jets, tracks);
+    }
+*/
     fillMixLeadingJetHadronHistograms(collisions, jets, tracks);
   }
   PROCESS_SWITCH(ChargedJetHadron, processMixLeadingJetHadronCorrelation, "leadingjet-h mixed event correlation for Data", false);
@@ -1383,9 +1395,12 @@ struct ChargedJetHadron {
       if (!jetfindingutilities::isInEtaAcceptance(jet, jetEtaMin, jetEtaMax, trackEtaMin, trackEtaMax)) {
         continue;
       }
-      if (!isAcceptedJet<aod::JetTracks>(jet)) {
+      using TracksTable = std::decay_t<decltype(tracks)>;
+      if (!isAcceptedJet<TracksTable>(jet)) {
         continue;
-      }
+      //if (!isAcceptedJet<aod::JetTracks>(jet)) {
+      //  continue;
+      //}
       fillJetAreaSubHistograms(jet, collision.rho());
     }
     fillLeadingJetHadronHistograms(collision, jets, tracks);
