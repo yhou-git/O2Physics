@@ -61,20 +61,6 @@ using namespace o2::soa;
 
 struct ChargedJetHadron {
 
-  using McParticleCollision = soa::Join<aod::JetMcCollisions, aod::BkgChargedMcRhos>::iterator;
-  using McParticleCollisions = soa::Join<aod::JetMcCollisions, aod::BkgChargedMcRhos>;
-  //using McParticleCollisions = soa::Join<aod::JetMcCollisions, aod::BkgChargedMcRhos, aod::MultsGlobal>;
-  using CorrChargedJets = soa::Join<aod::ChargedJets, aod::ChargedJetConstituents>;
-  using CorrChargedMCDJets = soa::Join<aod::ChargedMCDetectorLevelJets, aod::ChargedMCDetectorLevelJetConstituents>;
-  using CorrChargedMCPJets = soa::Join<aod::ChargedMCParticleLevelJets, aod::ChargedMCParticleLevelJetConstituents>;
-
-  // using BinningType = ColumnBinningPolicy<aod::jcollision::PosZ, aod::cent::centFT0M>;
-  using BinningType = ColumnBinningPolicy<aod::jcollision::PosZ, aod::mult::MultNTracksGlobal>;
-  using BinningTypeMC = ColumnBinningPolicy<aod::jmccollision::PosZ, aod::mult::MultNTracksGlobal>;
-  //using BinningTypeMC = ColumnBinningPolicy<aod::jcollision::PosZ, aod::mult::MultNTracksGlobal>;
-  // using BinningType = ColumnBinningPolicy<aod::jcollision::PosZ, aod::mult::MultFT0M<aod::mult::MultFT0A, aod::mult::MultFT0C>>;
-  // using BinningType = ColumnBinningPolicy<aod::jcollision::PosZ, aod::jcollision::centFT0M>;
-
   Configurable<float> selectedJetsRadius{"selectedJetsRadius", 0.4, "resolution parameter for histograms without radius"};
   Configurable<std::string> eventSelections{"eventSelections", "sel8", "choose event selection"};
   Configurable<float> vertexZCut{"vertexZCut", 10.0f, "Accepted z-vertex range"};
@@ -102,21 +88,39 @@ struct ChargedJetHadron {
   Configurable<int> acceptSplitCollisions{"acceptSplitCollisions", 0, "0: only look at mcCollisions that are not split; 1: accept split mcCollisions, 2: accept split mcCollisions but only look at the first reco collision associated with it"};
   Configurable<bool> skipMBGapEvents{"skipMBGapEvents", false, "flag to choose to reject min. bias gap events; jet-level rejection can also be applied at the jet finder level for jets only, here rejection is applied for collision and track process functions for the first time, and on jets in case it was set to false at the jet finder level"};
   Configurable<bool> checkLeadConstituentPtForMcpJets{"checkLeadConstituentPtForMcpJets", false, "flag to choose whether particle level jets should have their lead track pt above leadingConstituentPtMin to be accepted; off by default, as leadingConstituentPtMin cut is only applied on MCD jets for the Pb-Pb analysis using pp MC anchored to Pb-Pb for the response matrix"};
-  // 20250918 mixed events
+  Configurable<int> cfgCentEstimator{"cfgCentEstimator", 0, "0:FT0C; 1:FT0A; 2:FT0M"};
   //
+  // 20250918 mixed events
   Configurable<int> numberEventsMixed{"numberEventsMixed", 5, "number of events mixed in ME process"};
   ConfigurableAxis binsZVtx{"binsZVtx", {VARIABLE_WIDTH, -10.0f, -2.5f, 2.5f, 10.0f}, "Mixing bins - z-vertex"};
   //  ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0.0f, 2000.0f, 6000.0f, 100000.0f}, "Mixing bins - multiplicity"}; // zhang zhen
   ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0.0f, 15.0f, 25.0f, 35.0f, 50.0f}, "Mixing bins - multiplicity"}; // Julius Kinner photon-jet correlation analys
   ConfigurableAxis binsCentrality{"binsCentrality", {VARIABLE_WIDTH, 0.0, 10., 50, 100.}, "Mixing bins - centrality"};
 
-  Configurable<int> cfgCentEstimator{"cfgCentEstimator", 0, "0:FT0C; 1:FT0A; 2:FT0M"};
   // Filter ..................
   Filter trackCuts = (aod::jtrack::pt >= trackPtMin && aod::jtrack::pt < trackPtMax && aod::jtrack::eta > trackEtaMin && aod::jtrack::eta < trackEtaMax);
   Filter particleCuts = (aod::jmcparticle::pt >= trackPtMin && aod::jmcparticle::pt < trackPtMax && aod::jmcparticle::eta > trackEtaMin && aod::jmcparticle::eta < trackEtaMax);
-  Filter eventCuts = (nabs(aod::jcollision::posZ) < vertexZCut && aod::jcollision::centFT0M >= centralityMin && aod::jcollision::centFT0M < centralityMax); // 20250814 and collision.centrality-> collision.centFT0M
+  Filter veterCut = nabs(aod::jcollision::posZ) < vertexZCut;
+  Filter veterCutMC = nabs(aod::jmccollision::posZ) < vertexZCut;
+
+  //Filter eventCuts = (nabs(aod::jcollision::posZ) < vertexZCut && aod::jcollision::centFT0M >= centralityMin && aod::jcollision::centFT0M < centralityMax); // 20250814 and collision.centrality-> collision.centFT0M
+  Filter eventCuts;
 
   SliceCache cache;
+  using McParticleCollision = soa::Join<aod::JetMcCollisions, aod::BkgChargedMcRhos>::iterator;
+  using McParticleCollisions = soa::Join<aod::JetMcCollisions, aod::BkgChargedMcRhos>;
+  //using McParticleCollisions = soa::Join<aod::JetMcCollisions, aod::BkgChargedMcRhos, aod::MultsGlobal>;
+  using CorrChargedJets = soa::Join<aod::ChargedJets, aod::ChargedJetConstituents>;
+  using CorrChargedMCDJets = soa::Join<aod::ChargedMCDetectorLevelJets, aod::ChargedMCDetectorLevelJetConstituents>;
+  using CorrChargedMCPJets = soa::Join<aod::ChargedMCParticleLevelJets, aod::ChargedMCParticleLevelJetConstituents>;
+
+  // using BinningType = ColumnBinningPolicy<aod::jcollision::PosZ, aod::cent::centFT0M>;
+  using BinningType = ColumnBinningPolicy<aod::jcollision::PosZ, aod::mult::MultNTracksGlobal>;
+  using BinningTypeMC = ColumnBinningPolicy<aod::jmccollision::PosZ, aod::mult::MultNTracksGlobal>;
+  //using BinningTypeMC = ColumnBinningPolicy<aod::jcollision::PosZ, aod::mult::MultNTracksGlobal>;
+  // using BinningType = ColumnBinningPolicy<aod::jcollision::PosZ, aod::mult::MultFT0M<aod::mult::MultFT0A, aod::mult::MultFT0C>>;
+  // using BinningType = ColumnBinningPolicy<aod::jcollision::PosZ, aod::jcollision::centFT0M>;
+
   using FilterCollision = soa::Filtered<soa::Join<aod::JetCollisions, aod::BkgChargedRhos>>::iterator;
   using FilterCollisions = soa::Filtered<soa::Join<aod::JetCollisions, aod::BkgChargedRhos, aod::MultsGlobal>>;
   using FilterJetTracks = soa::Filtered<aod::JetTracks>;
@@ -141,6 +145,14 @@ struct ChargedJetHadron {
   {
     eventSelectionBits = jetderiveddatautilities::initialiseEventSelectionBits(static_cast<std::string>(eventSelections));
     trackSelection = jetderiveddatautilities::initialiseTrackSelection(static_cast<std::string>(trackSelections));
+
+    if (cfgCentEstimator == 0) {
+      eventCuts = (aod::jcollision::centFT0C >= centralityMin && aod::jcollision::centFT0C <  centralityMax);
+    } else if (cfgCentEstimator == 1) {
+      eventCuts = (aod::jcollision::centFT0A >= centralityMin && aod::jcollision::centFT0A <  centralityMax);
+    } else {
+      eventCuts = (aod::jcollision::centFT0M >= centralityMin && aod::jcollision::centFT0M <  centralityMax);
+    }
 
     AxisSpec centralityAxis = {110, -5., 105., "Centrality"};
     AxisSpec trackPtAxis = {200, 0.0, 200.0, "#it{p}_{T} (GeV/#it{c})"};
@@ -407,6 +419,51 @@ struct ChargedJetHadron {
       registry.get<TH1>(HIST("h_mixmc_event_stats"))->GetXaxis()->SetBinLabel(4, "Total Lj-h pairs");
       registry.get<TH1>(HIST("h_mixmc_event_stats"))->GetXaxis()->SetBinLabel(5, "Total Lj-h pairs with cut");
     }
+  }
+
+// ==========================================================
+// getcentrality getmultiplicity
+// ==========================================================
+  template <typename TCollision>
+  float getCentrality(const TCollision& c) const {
+    if (cfgCentEstimator == 0) return c.centFT0C();
+    if (cfgCentEstimator == 1) return c.centFT0A();
+    return c.centFT0M();
+  }
+  
+  template <typename TCollision>
+  float getMultiplicity(const TCollision& c) const {
+    if (cfgCentEstimator == 0) return c.multFT0C();
+    if (cfgCentEstimator == 1) return c.multFT0A();
+    return c.multFT0M();
+  }
+
+// ==========================================================
+// event selection, vertexZ, occupancy, centrality
+// ==========================================================
+  template <typename TCollision>
+  bool isGoodCollisionWithCentralityAndVertex(const TCollision& coll,
+      const std::vector<int>& eventSelectionBits, bool skipMBGapEvents,
+      float trackOccupancyInTimeRangeMin, float trackOccupancyInTimeRangeMax,
+      float centralityMin, float centralityMax,
+      float vertexZCut,
+      int cfgCentEstimator) // 0:FT0C, 1:FT0A, 2:FT0M
+  {
+    if (!jetderiveddatautilities::selectCollision(coll, eventSelectionBits, skipMBGapEvents)) {
+      return false;
+    }
+    if (std::abs(coll.posZ()) > vertexZCut) {
+      return false;
+    }
+    const auto occ = coll.trackOccupancyInTimeRange();
+    if (occ < trackOccupancyInTimeRangeMin || occ > trackOccupancyInTimeRangeMax) {
+      return false;
+    }
+    float cent = getCentrality(coll);
+    if (cent < centralityMin || cent > centralityMax) {
+      return false;
+    }
+    return true;
   }
 
   template <typename TTracks, typename TJets>
