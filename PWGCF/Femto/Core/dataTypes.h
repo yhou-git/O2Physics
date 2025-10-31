@@ -29,7 +29,7 @@ using CollisionTagType = uint64_t;
 using CollisionMaskType = uint16_t;
 
 // datatypes for tracks
-using MomentumType = uint16_t;
+using MomentumType = uint8_t;
 using TrackMaskType = uint64_t;
 using TrackType = uint16_t;
 
@@ -49,6 +49,9 @@ using TwoTrackResonanceType = uint16_t;
 // datatypes for cascades
 using CascadeMaskType = uint16_t;
 using CascadeType = uint16_t;
+
+// datatype for particles
+using ParticleType = uint16_t;
 
 } // namespace femtodatatypes
 
