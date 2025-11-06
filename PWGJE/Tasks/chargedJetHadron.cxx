@@ -92,8 +92,11 @@ struct ChargedJetHadron {
   //
   Configurable<int> numberEventsMixed{"numberEventsMixed", 5, "number of events mixed in ME process"};
   ConfigurableAxis binsZVtx{"binsZVtx", {VARIABLE_WIDTH, -10.0f, -2.5f, 2.5f, 10.0f}, "Mixing bins - z-vertex"};
+  ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0.0f, 15.0f, 25.0f, 50.0f, 80.0f, 120.0f, 170.0f, 220.0f, 300.0f}, "Mixing bins - multiplicity"}; // Julius Kinner photon-jet correlation analys
   //  ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0.0f, 2000.0f, 6000.0f, 100000.0f}, "Mixing bins - multiplicity"}; // zhang zhen
-  ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0.0f, 15.0f, 25.0f, 35.0f, 50.0f}, "Mixing bins - multiplicity"}; // Julius Kinner photon-jet correlation analys
+  //ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0.0f, 15.0f, 25.0f, 35.0f, 50.0f}, "Mixing bins - multiplicity"}; // Julius Kinner photon-jet correlation analys
+  //ConfigurableAxis binsZVtx{"binsZVtx", {VARIABLE_WIDTH, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, "vertex axis for mixed event histograms"};
+  //ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0, 10, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260}, "multiplicity / centrality axis for mixed event histograms"};
   ConfigurableAxis binsCentrality{"binsCentrality", {VARIABLE_WIDTH, 0.0, 10., 50, 100.}, "Mixing bins - centrality"};
 
   // Filter ..................
@@ -445,7 +448,7 @@ struct ChargedJetHadron {
   float getMultiplicity(const TCollision& coll) const {
     if (cfgCentEstimator.value == 0) return coll.multFT0C();
     if (cfgCentEstimator.value == 1) return coll.multFT0A();
-    return coll.multFT0M();
+    return coll.multFT0C() + coll.multFT0A();
   }
 
 // ==========================================================
@@ -456,8 +459,7 @@ struct ChargedJetHadron {
       const std::vector<int>& eventSelectionBits, bool skipMBGapEvents,
       float trackOccupancyInTimeRangeMin, float trackOccupancyInTimeRangeMax,
       float centralityMin, float centralityMax,
-      float vertexZCut,
-      int cfgCentEstimator) // 0:FT0C, 1:FT0A, 2:FT0M
+      float vertexZCut)
   {
     if (!jetderiveddatautilities::selectCollision(coll, eventSelectionBits, skipMBGapEvents)) {
       return false;
@@ -652,16 +654,25 @@ struct ChargedJetHadron {
   template <typename TCollisions, typename TJets, typename TTracks>
   void fillMixJetHadronHistograms(const TCollisions& collisions, const TJets& jets, const TTracks& tracks, float eventWeight = 1.0)
   {
+    /*
+    auto getTracksSize = [&tracks, this](TCollisions::iterator const& col) {
+       auto associatedTracks = tracks.sliceByCached(o2::aod::track::collisionId, col.globalIndex(), this->cache); // it's cached, so slicing/grouping happens only once
+       auto globalTrack= associatedTracks.size();
+       return globalTrack;
+      };
+    using BinningType = FlexibleBinningPolicy<std::tuple<decltype(getTracksSize)>, aod::collision::PosZ, decltype(getTracksSize)>;
+    BinningType corrBinning{{getTracksSize}, {binsZVtx, binsMultiplicity}, true};
+  */
     auto tracksTuple = std::make_tuple(jets, tracks);
-    Pair<TCollisions, TJets, TTracks, BinningType> pairData{corrBinning, numberEventsMixed, -1, collisions, tracksTuple, &cache};
+    Pair<TCollisions, TJets, TTracks, BinningType> pairData{corrBinning, numberEventsMixed, -1, collisions, tracksTuple, &cache}; //// -1 is the number of the bin to skip
 
     for (const auto& [c1, jets1, c2, tracks2] : pairData) {
       registry.fill(HIST("h_mixjeth_event_stats"), 1);
       // int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), getMultiplicity(c2)));
-      if (!isGoodCollision(c1, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+      if (!isGoodCollision(c1, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
       }
-      if (!isGoodCollision(c2, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+      if (!isGoodCollision(c2, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
       }
 
@@ -731,7 +742,7 @@ struct ChargedJetHadron {
 
     for (const auto& [c1, jets1, c2, particles2] : pairMCData) {
       registry.fill(HIST("h_mixjeth_event_stats_part"), 1);
-      int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), getMultiplicity(c2)));
+      //int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), getMultiplicity(c2)));
 
       if (std::abs(c1.posZ()) > vertexZCut)
         return;
@@ -892,10 +903,10 @@ struct ChargedJetHadron {
       totalmix++;
       registry.fill(HIST("h_mix_event_stats"), 1);
       int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), getMultiplicity(c2)));
-      if (!isGoodCollision(c1, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+      if (!isGoodCollision(c1, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
       }
-      if (!isGoodCollision(c2, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+      if (!isGoodCollision(c2, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
       }
 
@@ -1239,7 +1250,7 @@ struct ChargedJetHadron {
   void processTracksQC(soa::Filtered<aod::JetCollisions>::iterator const& collision,
                        FilterJetTracks const& tracks)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     for (auto const& track : tracks) {
@@ -1275,7 +1286,7 @@ struct ChargedJetHadron {
                           CorrChargedJets const& jets,
                           aod::JetTracks const&)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     for (auto const& jet : jets) {
@@ -1294,7 +1305,7 @@ struct ChargedJetHadron {
                          CorrChargedMCDJets const& jets,
                          aod::JetTracks const&)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     for (auto const& jet : jets) {
@@ -1313,7 +1324,7 @@ struct ChargedJetHadron {
                                  CorrChargedJets const& jets,
                                  aod::JetTracks const&)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     for (auto const& jet : jets) {
@@ -1332,7 +1343,7 @@ struct ChargedJetHadron {
                                CorrChargedJets const& jets,
                                FilterJetTracks const& tracks)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     fillLeadingJetHadronHistograms(collision, jets, tracks);
@@ -1365,7 +1376,7 @@ struct ChargedJetHadron {
                         CorrChargedJets const& jets,
                         FilterJetTracks const& tracks)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     fillJetHadronHistograms(collision, jets, tracks);
@@ -1398,7 +1409,7 @@ struct ChargedJetHadron {
                                CorrChargedJets const& jets,
                                aod::CandidatesD0Data const& candidates)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     for (const auto& jet : jets) {
@@ -1432,7 +1443,7 @@ struct ChargedJetHadron {
                                 CorrChargedMCDJets const& jets,
 				aod::JetTracks const&)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     for (auto const& jet : jets) {
@@ -1451,7 +1462,7 @@ struct ChargedJetHadron {
                                  CorrChargedMCDJets const& jets,
                                  FilterJetTracks const& tracks)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     fillLeadingJetHadronHistograms(collision, jets, tracks);
@@ -1483,7 +1494,7 @@ struct ChargedJetHadron {
                            CorrChargedMCDJets const& jets,
                            FilterJetTracks const& tracks)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     fillJetHadronHistograms(collision, jets, tracks);
@@ -1516,7 +1527,7 @@ struct ChargedJetHadron {
                                  soa::Join<aod::ChargedMCDetectorLevelJets, aod::ChargedMCDetectorLevelJetConstituents, aod::ChargedMCDetectorLevelJetEventWeights> const& jets,
                                  aod::JetTracks const&)
   {
-    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut, cfgCentEstimator)) {
+    if (!isGoodCollision(collision, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
       return;
     }
     for (auto const& jet : jets) {
@@ -1818,7 +1829,7 @@ struct ChargedJetHadron {
     if (!hasSel8Coll || !centralityIsGood || !occupancyIsGood) {
       return;
     }
-//    fillMCPMixJetHadronHistograms(mccollisions, jets, particles); //MCP mixed problem: error: no matching function for call to 'o2::aod::mult::MultNTracksGlobal::MultNTracksGlobal()
+    //fillMCPMixJetHadronHistograms(mccollisions, jets, particles); //MCP mixed problem: error: no matching function for call to 'o2::aod::mult::MultNTracksGlobal::MultNTracksGlobal()
   }
   PROCESS_SWITCH(ChargedJetHadron, processMixJetHadronMCP, "mixed event jet-hadron for MCP", false);
 
