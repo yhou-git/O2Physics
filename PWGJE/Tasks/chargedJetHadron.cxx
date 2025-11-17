@@ -910,7 +910,8 @@ struct ChargedJetHadron {
     for (const auto& [c1, jets1, c2, tracks2] : pairData) {
       totalmix++;
       registry.fill(HIST("h_mix_event_stats"), 1);
-      int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), getMultiplicity(c2)));;
+      int poolBin = corrBinning.getBin(std::make_tuple(c2.posZ(), getMultiplicity(c2)));
+      ;
       if (!isGoodCollision(c1, eventSelectionBits, skipMBGapEvents, trackOccupancyInTimeRangeMin, trackOccupancyInTimeRangeMax, centralityMin, centralityMax, vertexZCut)) {
         return;
       }
@@ -1259,8 +1260,8 @@ struct ChargedJetHadron {
   PROCESS_SWITCH(ChargedJetHadron, processCollisionsQC, "collisions and tracks QC for Data and MCD", true);
 
   void processCollisionsQCWeighted(soa::Join<aod::JetCollisions, aod::JMcCollisionLbs>::iterator const& collision,
-                                 aod::JetMcCollisions const&,
-                                 FilterJetTracks const& tracks)
+                                   aod::JetMcCollisions const&,
+                                   FilterJetTracks const& tracks)
   {
     if (!collision.has_mcCollision()) {
       registry.fill(HIST("h_fakecollisions"), 0.5);
@@ -1648,7 +1649,7 @@ struct ChargedJetHadron {
     registry.fill(HIST("h_mcColl_rho"), mccollision.rho());
     registry.fill(HIST("h_mcColl_centrality"), centrality);
     registry.fill(HIST("h_mcColl_mult"), multiplicity);
-    //problem for mccollision' has no member named 'multFT0M'; did you mean 'multFT0A'?  // return coll.multFT0M();
+    // problem for mccollision' has no member named 'multFT0M'; did you mean 'multFT0A'?  // return coll.multFT0M();
 
     // particle QC...........
     for (auto const& particle : particles) {
