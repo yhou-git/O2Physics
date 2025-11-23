@@ -992,7 +992,7 @@ struct ChargedJetHadron {
           registry.fill(HIST("h_mixjeth_deta"), deta, eventWeight);
           registry.fill(HIST("h_mixjeth_dphi"), dphi, eventWeight);
           registry.fill(HIST("h2_mixjeth_detatot_dphi"), detatot, dphi, eventWeight);
-          registry.fill(HIST("thn_mixjethadron"), ptLeadingCorr, ptSubleadingCorr, hpt, multEta1Eta2, heta, deltaEtaJets, deta, dphi, poolBin, eventWeight);
+          registry.fill(HIST("thn_mixljeth_correlations"), ptLeadingCorr, ptSubleadingCorr, hpt, multEta1Eta2, heta, deltaEtaJets, deta, dphi, poolBin, eventWeight);
           if (hpt < assoHadronPtCut) {
             registry.fill(HIST("h2_mixjeth_deta_dphi"), deta, dphi, eventWeight);
             if (std::abs(deltaEtaJets) >= etaGapup)
