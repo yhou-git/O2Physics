@@ -34,6 +34,7 @@
 #include "Common/Core/trackUtilities.h"
 #include "Common/DataModel/CollisionAssociationTables.h"
 #include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/Multiplicity.h"
 #include "Common/DataModel/PIDResponseTOF.h"
 #include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/DataModel/TrackSelectionTables.h"
@@ -59,11 +60,12 @@
 #include <Framework/WorkflowSpec.h>
 #include <Framework/runDataProcessing.h>
 #include <ReconstructionDataFormats/DCA.h>
-#include <ReconstructionDataFormats/Track.h>
 
 #include <TH1.h>
 #include <TH2.h>
 #include <TPDGCode.h>
+
+#include <Rtypes.h>
 
 #include <algorithm>
 #include <array>
@@ -103,13 +105,13 @@ enum WrongCollisionType : uint8_t {
   SplitCollision,
 };
 
-std::map<int, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain> partlyRecoDecayMapMuMu = {
+std::map<int, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain> const partlyRecoDecayMapMuMu = {
   {Pdg::kB0, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain::B0ToJpsiXToMuMuX},
   {Pdg::kBPlus, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain::BplusToJpsiXToMuMuX},
   {Pdg::kBS, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain::BsToJpsiXToMuMuX},
   {Pdg::kLambdaB0, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain::LbToJpsiXToMuMuX}};
 
-std::map<int, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain> partlyRecoDecayMapEE = {
+std::map<int, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain> const partlyRecoDecayMapEE = {
   {Pdg::kB0, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain::B0ToJpsiXToEEX},
   {Pdg::kBPlus, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain::BplusToJpsiXToEEX},
   {Pdg::kBS, hf_decay::hf_cand_beauty::DecayChannelToJpsiMain::BsToJpsiXToEEX},
@@ -127,6 +129,7 @@ struct HfDataCreatorJpsiHadReduced {
   // J/Psi related tables
   Produces<aod::HfRedJpsis> hfJpsi;
   Produces<aod::HfRedJpsiCov> hfRedJpsiCov;
+  Produces<aod::HfRedJpsiDauPid> hfRedJpsiDauPid;
   // Ka bachelor related tables
   Produces<aod::HfRedBach0Bases> hfTrackLfDau0;
   Produces<aod::HfRedBach0Cov> hfTrackCovLfDau0;
@@ -152,6 +155,8 @@ struct HfDataCreatorJpsiHadReduced {
   Configurable<double> maxDZIni{"maxDZIni", 4., "reject (if>0) PCA candidate if tracks DZ exceeds threshold"};
   Configurable<double> minParamChange{"minParamChange", 1.e-3, "stop iterations if largest change of any B0 is smaller than this"};
   Configurable<double> minRelChi2Change{"minRelChi2Change", 0.9, "stop iterations is chi2/chi2old > this"};
+  Configurable<double> maxChi2JPsiVtx{"maxChi2JPsiVtx", 1e9, "maximum value of chi2 for JPsi vertex computed with DCAFitter"};
+  Configurable<double> maxChi2BhadVtx{"maxChi2BhadVtx", 0.9, "maximum value of chi2 for B-hadron vertex computed with DCAFitter"};
 
   struct : o2::framework::ConfigurableGroup {
     // TPC PID
@@ -188,10 +193,10 @@ struct HfDataCreatorJpsiHadReduced {
   // O2DatabasePDG service
   Service<o2::framework::O2DatabasePDG> pdg{};
 
-  using TracksPid = soa::Join<aod::pidTPCFullPi, aod::pidTOFFullPi, aod::pidTPCFullKa, aod::pidTOFFullKa, aod::pidTPCFullPr, aod::pidTOFFullPr, aod::pidTPCFullEl, aod::pidTOFFullEl>;
+  using TracksPid = soa::Join<aod::pidTPCFullPi, aod::pidTOFFullPi, aod::pidTPCFullKa, aod::pidTOFFullKa, aod::pidTPCFullPr, aod::pidTOFFullPr, aod::pidTPCFullEl, aod::pidTOFFullEl, aod::pidTPCFullMu, aod::pidTOFFullMu>;
   using TracksPidWithSel = soa::Join<aod::TracksWCovDcaExtra, TracksPid, aod::TrackSelection>;
   using TracksPidWithSelAndMc = soa::Join<TracksPidWithSel, aod::McTrackLabels>;
-  using CollisionsWCMcLabels = soa::Join<aod::Collisions, aod::McCollisionLabels, aod::EvSels>;
+  using CollisionsWCMcLabels = soa::Join<aod::Collisions, aod::McCollisionLabels, aod::EvSels, aod::PVMults>;
   using BCsInfo = soa::Join<aod::BCsWithTimestamps, aod::BcSels>;
 
   Preslice<aod::HfCand2ProngWPid> candsJpsiPerCollision = aod::track_association::collisionId;
@@ -244,7 +249,7 @@ struct HfDataCreatorJpsiHadReduced {
     labels[1 + aod::SelectionStep::RecoTopol] = "Skims & Topological selections";
     labels[1 + aod::SelectionStep::RecoPID] = "Skims & Topological & PID selections";
     static const AxisSpec axisSelections = {NumBinsSelections, 0.5, NumBinsSelections + 0.5, ""};
-    registry.add("hSelectionsJpsi", "J/Psi selection;;#it{p}_{T} (GeV/#it{c})", {HistType::kTH2F, {axisSelections, {(std::vector<double>)binsPt, "#it{p}_{T} (GeV/#it{c})"}}});
+    registry.add("hSelectionsJpsi", "J/Psi selection;;#it{p}_{T} (GeV/#it{c})", {HistType::kTH2F, {axisSelections, {std::vector<double>(binsPt), "#it{p}_{T} (GeV/#it{c})"}}});
     for (int iBin = 0; iBin < NumBinsSelections; ++iBin) {
       registry.get<TH2>(HIST("hSelectionsJpsi"))->GetXaxis()->SetBinLabel(iBin + 1, labels[iBin].data());
     }
@@ -261,7 +266,7 @@ struct HfDataCreatorJpsiHadReduced {
     }
 
     registry.add("hMassJpsi", "J/Psi mass;#it{M}_{#mu#mu} (GeV/#it{c}^{2});Counts", {HistType::kTH1D, {{600, 2.8, 3.4, "#it{p}_{T} (GeV/#it{c})"}}});
-    registry.add("hPtJpsi", "J/Psi #it{p}_{T};#it{p}_{T} (GeV/#it{c});Counts", {HistType::kTH1D, {{(std::vector<double>)binsPt, "#it{p}_{T} (GeV/#it{c})"}}});
+    registry.add("hPtJpsi", "J/Psi #it{p}_{T};#it{p}_{T} (GeV/#it{c});Counts", {HistType::kTH1D, {{std::vector<double>(binsPt), "#it{p}_{T} (GeV/#it{c})"}}});
     registry.add("hCpaJpsi", "J/Psi cos#theta_{p};J/Psi cos#theta_{p};Counts", {HistType::kTH1D, {{200, -1., 1, "J/Psi cos#theta_{p}"}}});
     std::shared_ptr<TH1> hFitCandidatesJpsi = registry.add<TH1>("hFitCandidatesJpsi", "Jpsi candidate counter", {HistType::kTH1D, {axisCands}});
     std::shared_ptr<TH1> hFitCandidatesBPlus = registry.add<TH1>("hFitCandidatesBPlus", "hFitCandidatesBPlus candidate counter", {HistType::kTH1D, {axisCands}});
@@ -295,27 +300,32 @@ struct HfDataCreatorJpsiHadReduced {
     df2.setMaxDZIni(maxDZIni);
     df2.setMinParamChange(minParamChange);
     df2.setMinRelChi2Change(minRelChi2Change);
+    df2.setMaxChi2(maxChi2JPsiVtx);
     df2.setUseAbsDCA(useAbsDCA);
     df2.setWeightedFinalPCA(useWeightedFinalPCA);
     df2.setMatCorrType(noMatCorr);
 
-    df3.setPropagateToPCA(propagateToPCA);
-    df3.setMaxR(maxR);
-    df3.setMaxDZIni(maxDZIni);
-    df3.setMinParamChange(minParamChange);
-    df3.setMinRelChi2Change(minRelChi2Change);
-    df3.setUseAbsDCA(useAbsDCA);
-    df3.setWeightedFinalPCA(useWeightedFinalPCA);
-    df3.setMatCorrType(noMatCorr);
-
-    df4.setPropagateToPCA(propagateToPCA);
-    df4.setMaxR(maxR);
-    df4.setMaxDZIni(maxDZIni);
-    df4.setMinParamChange(minParamChange);
-    df4.setMinRelChi2Change(minRelChi2Change);
-    df4.setUseAbsDCA(useAbsDCA);
-    df4.setWeightedFinalPCA(useWeightedFinalPCA);
-    df4.setMatCorrType(noMatCorr);
+    if (doprocessJpsiKData || doprocessJpsiKMc) {
+      df3.setPropagateToPCA(propagateToPCA);
+      df3.setMaxR(maxR);
+      df3.setMaxDZIni(maxDZIni);
+      df3.setMinParamChange(minParamChange);
+      df3.setMinRelChi2Change(minRelChi2Change);
+      df3.setMaxChi2(maxChi2BhadVtx);
+      df3.setUseAbsDCA(useAbsDCA);
+      df3.setWeightedFinalPCA(useWeightedFinalPCA);
+      df3.setMatCorrType(noMatCorr);
+    } else {
+      df4.setPropagateToPCA(propagateToPCA);
+      df4.setMaxR(maxR);
+      df4.setMaxDZIni(maxDZIni);
+      df4.setMinParamChange(minParamChange);
+      df4.setMinRelChi2Change(minRelChi2Change);
+      df4.setMaxChi2(maxChi2BhadVtx);
+      df4.setUseAbsDCA(useAbsDCA);
+      df4.setWeightedFinalPCA(useWeightedFinalPCA);
+      df4.setMatCorrType(noMatCorr);
+    }
 
     // Configure CCDB access
     ccdb->setURL(ccdbUrl);
@@ -525,11 +535,11 @@ struct HfDataCreatorJpsiHadReduced {
 
           // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (µ+µ-)
           // In EVTGEN, bremmstralhung photons are considered as daughters of the J/Psi
-          std::vector<int> jpsiDauIndices{};
+          std::vector<int> jpsiDauPdgs{};
           for (const auto& dau : jpsiPart.template daughters_as<PParticles>()) {
-            jpsiDauIndices.push_back(dau.pdgCode());
+            jpsiDauPdgs.push_back(dau.pdgCode());
           }
-          if (jpsiDauIndices.size() - std::count(jpsiDauIndices.begin(), jpsiDauIndices.end(), kGamma) == nProngsJpsi) {
+          if (jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
             flag = signB * o2::hf_decay::hf_cand_beauty::BplusToJpsiKToMuMuK;
           }
         }
@@ -558,11 +568,11 @@ struct HfDataCreatorJpsiHadReduced {
 
               // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (e+e-)
               // In EVTGEN, bremmstralhung photons are considered as daughters of the J/Psi
-              std::vector<int> jpsiDauIndices{};
+              std::vector<int> jpsiDauPdgs{};
               for (const auto& dau : jpsiPart.template daughters_as<PParticles>()) {
-                jpsiDauIndices.push_back(dau.pdgCode());
+                jpsiDauPdgs.push_back(dau.pdgCode());
               }
-              if (jpsiDauIndices.size() - std::count(jpsiDauIndices.begin(), jpsiDauIndices.end(), kGamma) == nProngsJpsi) {
+              if (jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
                 flag = signB * o2::hf_decay::hf_cand_beauty::BplusToJpsiKToEEK;
               }
             }
@@ -584,7 +594,7 @@ struct HfDataCreatorJpsiHadReduced {
               // check that the other prongs come from the same b-hadron
               int const index2Mother = RecoDecay::getMother(particlesMc, vecDaughtersB[2].mcParticle(), bHadronMotherHypo, true);
               if (indexRecB > -1 && indexRecJPsi > -1 && index2Mother > -1 && index2Mother == indexRecB) {
-                flag = jpsiDau == kMuonMinus ? signB * partlyRecoDecayMapMuMu[std::abs(bHadronMotherHypo)] : signB * partlyRecoDecayMapEE[std::abs(bHadronMotherHypo)];
+                flag = jpsiDau == kMuonMinus ? signB * partlyRecoDecayMapMuMu.at(std::abs(bHadronMotherHypo)) : signB * partlyRecoDecayMapEE.at(std::abs(bHadronMotherHypo));
                 break;
               }
             }
@@ -605,16 +615,16 @@ struct HfDataCreatorJpsiHadReduced {
         std::vector<int> dauIndices{};
         const int8_t signB = sign;
         // Since J/Psi is self-conjugate, we need to set acceptAntiParticles to false
-        if (RecoDecay::isMatchedMCGen<false>(particlesMc, bParticle, signB * Pdg::kB0, std::array{+kJPsi, signB * Pdg::kK0Star892}, false, nullptr, 1, &dauIndices)) {
+        if (RecoDecay::isMatchedMCGen(particlesMc, bParticle, signB * Pdg::kB0, std::array{+kJPsi, signB * Pdg::kK0Star892}, false, nullptr, 1, &dauIndices)) {
           const auto& jpsiPart = particlesMc.rawIteratorAt(dauIndices[0]);
 
           // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (e+e-)
           // In EVTGEN, bremmstralhung photons are considered as daughters of the J/Psi
-          std::vector<int> jpsiDauIndices{};
+          std::vector<int> jpsiDauPdgs{};
           for (const auto& dau : jpsiPart.template daughters_as<PParticles>()) {
-            jpsiDauIndices.push_back(dau.pdgCode());
+            jpsiDauPdgs.push_back(dau.pdgCode());
           }
-          if (jpsiDauIndices.size() - std::count(jpsiDauIndices.begin(), jpsiDauIndices.end(), kGamma) == nProngsJpsi) {
+          if (jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
             flag = signB * o2::hf_decay::hf_cand_beauty::B0ToJpsiPiKToMuMuPiK;
             indexRec = RecoDecay::getMatchedMCRec<false, false, false, true, true>(particlesMc, std::array{vecDaughtersB[2], vecDaughtersB[3]}, Pdg::kK0Star892, std::array{+kKPlus, -kPiPlus}, true, &sign, 1);
             if (indexRec > -1) {
@@ -642,16 +652,16 @@ struct HfDataCreatorJpsiHadReduced {
             const int8_t signB = sign;
 
             // Since J/Psi is self-conjugate, we need to set acceptAntiParticles to false
-            if (RecoDecay::isMatchedMCGen<false>(particlesMc, bParticle, signB * Pdg::kB0, std::array{+kJPsi, signB * Pdg::kK0Star892}, false, nullptr, 1, &dauIndices)) {
+            if (RecoDecay::isMatchedMCGen(particlesMc, bParticle, signB * Pdg::kB0, std::array{+kJPsi, signB * Pdg::kK0Star892}, false, nullptr, 1, &dauIndices)) {
               const auto& jpsiPart = particlesMc.rawIteratorAt(dauIndices[0]);
 
               // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (e+e-)
               // In EVTGEN, bremmstralhung photons are considered as daughters of the J/Psi
-              std::vector<int> jpsiDauIndices{};
+              std::vector<int> jpsiDauPdgs{};
               for (const auto& dau : jpsiPart.template daughters_as<PParticles>()) {
-                jpsiDauIndices.push_back(dau.pdgCode());
+                jpsiDauPdgs.push_back(dau.pdgCode());
               }
-              if (jpsiDauIndices.size() - std::count(jpsiDauIndices.begin(), jpsiDauIndices.end(), kGamma) == nProngsJpsi) {
+              if (jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
                 flag = signB * o2::hf_decay::hf_cand_beauty::B0ToJpsiPiKToEEPiK;
                 indexRec = RecoDecay::getMatchedMCRec<false, false, false, true, true>(particlesMc, std::array{vecDaughtersB[2], vecDaughtersB[3]}, Pdg::kK0Star892, std::array{+kKPlus, -kPiPlus}, true, &sign, 1);
                 if (indexRec > -1) {
@@ -684,7 +694,7 @@ struct HfDataCreatorJpsiHadReduced {
               int const index2Mother = RecoDecay::getMother(particlesMc, vecDaughtersB[2].mcParticle(), bHadronMotherHypo, true);
               int const index3Mother = RecoDecay::getMother(particlesMc, vecDaughtersB[3].mcParticle(), bHadronMotherHypo, true);
               if (indexRecB > -1 && indexRecJPsi > -1 && index2Mother > -1 && index3Mother > -1 && index2Mother == indexRecB && index3Mother == indexRecB) {
-                flag = jpsiDau == kMuonMinus ? signB * partlyRecoDecayMapMuMu[std::abs(bHadronMotherHypo)] : signB * partlyRecoDecayMapEE[std::abs(bHadronMotherHypo)];
+                flag = jpsiDau == kMuonMinus ? signB * partlyRecoDecayMapMuMu.at(std::abs(bHadronMotherHypo)) : signB * partlyRecoDecayMapEE.at(std::abs(bHadronMotherHypo));
                 break;
               }
             }
@@ -705,16 +715,16 @@ struct HfDataCreatorJpsiHadReduced {
         std::vector<int> dauIndices{};
         const int8_t signB = sign;
         // Since J/Psi and phi are self-conjugate, we need to set acceptAntiParticles to false
-        if (RecoDecay::isMatchedMCGen<false>(particlesMc, bParticle, signB * Pdg::kBS, std::array{+kJPsi, +Pdg::kPhi}, false, nullptr, 1, &dauIndices)) {
+        if (RecoDecay::isMatchedMCGen(particlesMc, bParticle, signB * Pdg::kBS, std::array{+kJPsi, +Pdg::kPhi}, false, nullptr, 1, &dauIndices)) {
           const auto& jpsiPart = particlesMc.rawIteratorAt(dauIndices[0]);
 
           // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (e+e-)
           // In EVTGEN, bremmstralhung photons are considered as daughters of the J/Psi
-          std::vector<int> jpsiDauIndices{};
+          std::vector<int> jpsiDauPdgs{};
           for (const auto& dau : jpsiPart.template daughters_as<PParticles>()) {
-            jpsiDauIndices.push_back(dau.pdgCode());
+            jpsiDauPdgs.push_back(dau.pdgCode());
           }
-          if (jpsiDauIndices.size() - std::count(jpsiDauIndices.begin(), jpsiDauIndices.end(), kGamma) == nProngsJpsi) {
+          if (jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
             flag = signB * o2::hf_decay::hf_cand_beauty::BsToJpsiKKToMuMuKK;
             indexRec = RecoDecay::getMatchedMCRec<false, false, false, true, true>(particlesMc, std::array{vecDaughtersB[2], vecDaughtersB[3]}, Pdg::kPhi, std::array{+kKPlus, -kKPlus}, true, &sign, 1);
             if (indexRec > -1) {
@@ -742,16 +752,16 @@ struct HfDataCreatorJpsiHadReduced {
             const int8_t signB = sign;
 
             // Since J/Psi and phi are self-conjugate, we need to set acceptAntiParticles to false
-            if (RecoDecay::isMatchedMCGen<false>(particlesMc, bParticle, signB * Pdg::kBS, std::array{+kJPsi, +Pdg::kPhi}, false, nullptr, 1, &dauIndices)) {
+            if (RecoDecay::isMatchedMCGen(particlesMc, bParticle, signB * Pdg::kBS, std::array{+kJPsi, +Pdg::kPhi}, false, nullptr, 1, &dauIndices)) {
               const auto& jpsiPart = particlesMc.rawIteratorAt(dauIndices[0]);
 
               // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (e+e-)
               // In EVTGEN, bremmstralhung photons are considered as daughters of the J/Psi
-              std::vector<int> jpsiDauIndices{};
+              std::vector<int> jpsiDauPdgs{};
               for (const auto& dau : jpsiPart.template daughters_as<PParticles>()) {
-                jpsiDauIndices.push_back(dau.pdgCode());
+                jpsiDauPdgs.push_back(dau.pdgCode());
               }
-              if (jpsiDauIndices.size() - std::count(jpsiDauIndices.begin(), jpsiDauIndices.end(), kGamma) == nProngsJpsi) {
+              if (jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
                 flag = signB * o2::hf_decay::hf_cand_beauty::BsToJpsiKKToEEKK;
                 indexRec = RecoDecay::getMatchedMCRec<false, false, false, true, true>(particlesMc, std::array{vecDaughtersB[2], vecDaughtersB[3]}, Pdg::kPhi, std::array{+kKPlus, -kKPlus}, true, &sign, 1);
                 if (indexRec > -1) {
@@ -785,7 +795,7 @@ struct HfDataCreatorJpsiHadReduced {
               int const index2Mother = RecoDecay::getMother(particlesMc, vecDaughtersB[2].mcParticle(), bHadronMotherHypo, true);
               int const index3Mother = RecoDecay::getMother(particlesMc, vecDaughtersB[3].mcParticle(), bHadronMotherHypo, true);
               if (indexRecB > -1 && indexRecJPsi > -1 && index2Mother > -1 && index3Mother > -1 && index2Mother == indexRecB && index3Mother == indexRecB) {
-                flag = jpsiDau == kMuonMinus ? signB * partlyRecoDecayMapMuMu[std::abs(bHadronMotherHypo)] : signB * partlyRecoDecayMapEE[std::abs(bHadronMotherHypo)];
+                flag = jpsiDau == kMuonMinus ? signB * partlyRecoDecayMapMuMu.at(std::abs(bHadronMotherHypo)) : signB * partlyRecoDecayMapEE.at(std::abs(bHadronMotherHypo));
                 break;
               }
             }
@@ -834,14 +844,21 @@ struct HfDataCreatorJpsiHadReduced {
 
     // Match generated particles.
     for (const auto& particle : mcParticlesPerMcColl) {
-      int8_t sign{0}, flag{0}, channel{0};
+      int8_t sign = particle.pdgCode() > 0 ? 1 : -1;
+      int8_t flag{0}, channel{0};
       if constexpr (DecChannel == DecayChannel::BplusToJpsiK) {
         // B+ → J/Psi K+ → (µ+µ-) K+
-        if (RecoDecay::isMatchedMCGen<false>(particlesMc, particle, Pdg::kBPlus, std::array{static_cast<int>(Pdg::kJPsi), +kKPlus}, true, &sign)) {
+        // Since J/Psi is self-conjugate, we need to set acceptAntiParticles to false
+        if (RecoDecay::isMatchedMCGen(particlesMc, particle, sign * Pdg::kBPlus, std::array{static_cast<int>(Pdg::kJPsi), sign * kKPlus}, false)) {
           // Match J/Psi -> µ+µ-
-          auto candJpsiMC = particlesMc.rawIteratorAt(particle.daughtersIds().front());
-          // Printf("Checking J/Psi -> µ+µ-");
-          if (RecoDecay::isMatchedMCGen(particlesMc, candJpsiMC, static_cast<int>(Pdg::kJPsi), std::array{-kMuonMinus, +kMuonMinus}, true)) {
+          const auto& jpsiPart = particlesMc.rawIteratorAt(particle.daughtersIds().front());
+          // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (µ+µ-)
+          // In EVTGEN, bremmstralhung photons are considered as daughters of the J/Psi
+          std::vector<int> jpsiDauPdgs{};
+          for (const auto& dau : jpsiPart.template daughters_as<aod::McParticles>()) {
+            jpsiDauPdgs.push_back(dau.pdgCode());
+          }
+          if (std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kMuonMinus) == 1 && std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), -kMuonMinus) && jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
             flag = sign * o2::hf_decay::hf_cand_beauty::BplusToJpsiKToMuMuK;
           }
         }
@@ -870,16 +887,22 @@ struct HfDataCreatorJpsiHadReduced {
                             ptProngs[1], yProngs[1], etaProngs[1], hfRejMap, centFT0C, centFT0M);
       } else if constexpr (DecChannel == DecayChannel::B0ToJpsiK0Star) {
         // B0 → J/Psi K*0 → (µ+µ-) (K+pi-)
-        if (RecoDecay::isMatchedMCGen<true>(particlesMc, particle, Pdg::kB0, std::array{static_cast<int>(Pdg::kJPsi), +kKPlus, -kPiPlus}, true, &sign, 2)) {
+        // Since J/Psi is self-conjugate, we need to set acceptAntiParticles to false
+        if (RecoDecay::isMatchedMCGen(particlesMc, particle, sign * Pdg::kB0, std::array{static_cast<int>(Pdg::kJPsi), sign * kKPlus, -1 * sign * kPiPlus}, false, nullptr, 2)) {
           // Match J/Psi -> µ+µ- and K*0 -> K+pi-
-          auto candJpsiMC = particlesMc.rawIteratorAt(particle.daughtersIds().front());
-          auto candK0StarMC = particlesMc.rawIteratorAt(particle.daughtersIds().back());
-          // Printf("Checking J/Psi -> µ+µ- and K*0 -> K+pi-");
-          if (RecoDecay::isMatchedMCGen(particlesMc, candJpsiMC, static_cast<int>(Pdg::kJPsi), std::array{-kMuonMinus, +kMuonMinus}, true)) {
+          const auto& jpsiPart = particlesMc.rawIteratorAt(particle.daughtersIds().front());
+          // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (µ+µ-)
+          // In EVTGEN bremmstralhung photons are considered as daughters of the J/Psi
+          std::vector<int> jpsiDauPdgs{};
+          for (const auto& dau : jpsiPart.template daughters_as<aod::McParticles>()) {
+            jpsiDauPdgs.push_back(dau.pdgCode());
+          }
+          if (std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kMuonMinus) == 1 && std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), -kMuonMinus) && jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
             flag = sign * o2::hf_decay::hf_cand_beauty::B0ToJpsiPiKToMuMuPiK;
           }
+          const auto& kStarPart = particlesMc.rawIteratorAt(particle.daughtersIds().back());
           // Check K*0 -> K+pi-
-          if (RecoDecay::isMatchedMCGen(particlesMc, candK0StarMC, static_cast<int>(Pdg::kK0Star892), std::array{+kKPlus, -kPiPlus}, true)) {
+          if (RecoDecay::isMatchedMCGen(particlesMc, kStarPart, static_cast<int>(Pdg::kK0Star892), std::array{+kKPlus, -kPiPlus}, true)) {
             channel = o2::hf_decay::hf_cand_beauty::B0ToJpsiKstar0;
           }
         }
@@ -908,16 +931,22 @@ struct HfDataCreatorJpsiHadReduced {
                             ptProngs[1], yProngs[1], etaProngs[1], hfRejMap, centFT0C, centFT0M);
       } else if constexpr (DecChannel == DecayChannel::BsToJpsiPhi) {
         // Bs → J/Psi phi → (µ+µ-) (K+K-)
-        if (RecoDecay::isMatchedMCGen<true>(particlesMc, particle, Pdg::kBS, std::array{static_cast<int>(Pdg::kJPsi), +kKPlus, -kKPlus}, true, &sign, 2)) {
+        // Since J/Psi is self-conjugate, we need to set acceptAntiParticles to false
+        if (RecoDecay::isMatchedMCGen(particlesMc, particle, sign * Pdg::kBS, std::array{static_cast<int>(Pdg::kJPsi), sign * kKPlus, -1 * sign * kKPlus}, false, nullptr, 2)) {
           // Match J/Psi -> µ+µ- and phi -> K+K-
-          auto candJpsiMC = particlesMc.rawIteratorAt(particle.daughtersIds().front());
-          auto candPhiMC = particlesMc.rawIteratorAt(particle.daughtersIds().back());
-          // Printf("Checking J/Psi -> µ+µ- and phi -> K+K-");
-          if (RecoDecay::isMatchedMCGen(particlesMc, candJpsiMC, static_cast<int>(Pdg::kJPsi), std::array{-kMuonMinus, +kMuonMinus}, true)) {
+          const auto& jpsiPart = particlesMc.rawIteratorAt(particle.daughtersIds().front());
+          // Now we check that subtracting gammas from bremsstrahlung, the number of daughters of the J/Psi is 2 (µ+µ-)
+          // In EVTGEN, bremmstralhung photons are considered as daughters of the J/Psi
+          std::vector<int> jpsiDauPdgs{};
+          for (const auto& dau : jpsiPart.template daughters_as<aod::McParticles>()) {
+            jpsiDauPdgs.push_back(dau.pdgCode());
+          }
+          if (std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kMuonMinus) == 1 && std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), -kMuonMinus) && jpsiDauPdgs.size() - std::count(jpsiDauPdgs.begin(), jpsiDauPdgs.end(), kGamma) == nProngsJpsi) {
             flag = sign * o2::hf_decay::hf_cand_beauty::BsToJpsiKKToMuMuKK;
           }
+          const auto& phiPart = particlesMc.rawIteratorAt(particle.daughtersIds().back());
           // Check phi -> K+K-
-          if (RecoDecay::isMatchedMCGen(particlesMc, candPhiMC, static_cast<int>(Pdg::kPhi), std::array{-kKPlus, +kKPlus}, true)) {
+          if (RecoDecay::isMatchedMCGen(particlesMc, phiPart, static_cast<int>(Pdg::kPhi), std::array{-kKPlus, +kKPlus}, true)) {
             channel = o2::hf_decay::hf_cand_beauty::BsToJpsiPhi;
           }
         }
@@ -997,8 +1026,11 @@ struct HfDataCreatorJpsiHadReduced {
       runNumber = bc.runNumber();
     }
     df2.setBz(bz);
-    df3.setBz(bz);
-    df4.setBz(bz);
+    if constexpr (DecChannel == DecayChannel::BplusToJpsiK) {
+      df3.setBz(bz);
+    } else {
+      df4.setBz(bz);
+    }
 
     auto thisCollId = collision.globalIndex();
     // looping over 2-prong candidates
@@ -1007,7 +1039,7 @@ struct HfDataCreatorJpsiHadReduced {
       // Apply the selections on the J/Psi candidates
       registry.fill(HIST("hSelectionsJpsi"), 1, candidate.pt());
 
-      if (!(candidate.hfflag() & (1 << aod::hf_cand_2prong::DecayType::JpsiToMuMu))) {
+      if (!TESTBIT(candidate.hfflag(), aod::hf_cand_2prong::DecayType::JpsiToMuMu)) {
         continue;
       }
       registry.fill(HIST("hSelectionsJpsi"), 2 + aod::SelectionStep::RecoSkims, candidate.pt());
@@ -1101,7 +1133,6 @@ struct HfDataCreatorJpsiHadReduced {
           }
           registry.fill(HIST("hFitCandidatesBPlus"), SVFitting::FitOk);
 
-          o2::track::TrackParCov trackParCovBPlus{};
           std::array<float, 3> pVecBPlus{}, pVec0{}, pVec1{}, pVec2{};
 
           auto secondaryVertexBPlus = df3.getPCACandidate();
@@ -1110,8 +1141,6 @@ struct HfDataCreatorJpsiHadReduced {
           df3.getTrack(2).getPxPyPzGlo(pVec2);
           pVecBPlus = RecoDecay::pVec(pVec0, pVec1, pVec2);
           pVecJpsi = RecoDecay::pVec(pVec0, pVec1);
-          trackParCovBPlus = df3.createParentTrackParCov();
-          trackParCovBPlus.setAbsCharge(0); // to be sure
 
           if (!isBSelected(pVecBPlus, secondaryVertexBPlus, collision)) {
             continue;
@@ -1201,7 +1230,6 @@ struct HfDataCreatorJpsiHadReduced {
             }
             registry.fill(HIST("hFitCandidatesB0"), SVFitting::FitOk);
 
-            o2::track::TrackParCov trackParCovB0{};
             std::array<float, 3> pVecB0{}, pVec0{}, pVec1{}, pVecK0Star{};
 
             auto secondaryVertexB0 = df4.getPCACandidate();
@@ -1212,8 +1240,6 @@ struct HfDataCreatorJpsiHadReduced {
             pVecB0 = RecoDecay::pVec(pVec0, pVec1, pVec2, pVec3);
             pVecJpsi = RecoDecay::pVec(pVec0, pVec1);
             pVecK0Star = RecoDecay::pVec(pVec2, pVec3);
-            trackParCovB0 = df4.createParentTrackParCov();
-            trackParCovB0.setAbsCharge(0); // to be sure
 
             if (!isBSelected(pVecB0, secondaryVertexB0, collision)) {
               continue;
@@ -1333,7 +1359,6 @@ struct HfDataCreatorJpsiHadReduced {
             }
             registry.fill(HIST("hFitCandidatesBS"), SVFitting::FitOk);
 
-            o2::track::TrackParCov trackParCovBS{};
             std::array<float, 3> pVecBS{}, pVec0{}, pVec1{}, pVecPhi{};
 
             auto secondaryVertexBS = df4.getPCACandidate();
@@ -1344,8 +1369,6 @@ struct HfDataCreatorJpsiHadReduced {
             pVecBS = RecoDecay::pVec(pVec0, pVec1, pVec2, pVec3);
             pVecJpsi = RecoDecay::pVec(pVec0, pVec1);
             pVecPhi = RecoDecay::pVec(pVec2, pVec3);
-            trackParCovBS = df4.createParentTrackParCov();
-            trackParCovBS.setAbsCharge(0); // to be sure
 
             if (!isBSelected(pVecBS, secondaryVertexBS, collision)) {
               continue;
@@ -1456,6 +1479,10 @@ struct HfDataCreatorJpsiHadReduced {
                      trackPosParCov.getSigma1PtSnp(), trackNegParCov.getSigma1PtSnp(),
                      trackPosParCov.getSigma1PtTgl(), trackNegParCov.getSigma1PtTgl(),
                      trackPosParCov.getSigma1Pt2(), trackNegParCov.getSigma1Pt2());
+        hfRedJpsiDauPid(trackPos.tpcNSigmaMu(), trackNeg.tpcNSigmaMu(),
+                        trackPos.tpcNSigmaEl(), trackNeg.tpcNSigmaEl(),
+                        trackPos.tofNSigmaMu(), trackNeg.tofNSigmaMu(),
+                        trackPos.tofNSigmaEl(), trackNeg.tofNSigmaEl());
         fillHfReducedCollision = true;
       }
     } // candsJpsi loop
@@ -1480,7 +1507,7 @@ struct HfDataCreatorJpsiHadReduced {
     // }
   }
 
-  void processJpsiKData(soa::Join<aod::Collisions, aod::EvSels> const& collisions,
+  void processJpsiKData(soa::Join<aod::Collisions, aod::EvSels, aod::PVMults> const& collisions,
                         aod::HfCand2ProngWPid const& candsJpsi,
                         aod::TrackAssoc const& trackIndices,
                         TracksPidWithSel const& tracks,
@@ -1508,7 +1535,7 @@ struct HfDataCreatorJpsiHadReduced {
   }
   PROCESS_SWITCH(HfDataCreatorJpsiHadReduced, processJpsiKData, "Process J/Psi K without MC info", true);
 
-  void processJpsiPhiData(soa::Join<aod::Collisions, aod::EvSels> const& collisions,
+  void processJpsiPhiData(soa::Join<aod::Collisions, aod::EvSels, aod::PVMults> const& collisions,
                           aod::HfCand2ProngWPid const& candsJpsi,
                           aod::TrackAssoc const& trackIndices,
                           TracksPidWithSel const& tracks,
@@ -1536,7 +1563,7 @@ struct HfDataCreatorJpsiHadReduced {
   }
   PROCESS_SWITCH(HfDataCreatorJpsiHadReduced, processJpsiPhiData, "Process J/Psi phi without MC info", false);
 
-  void processJpsiK0StarData(soa::Join<aod::Collisions, aod::EvSels> const& collisions,
+  void processJpsiK0StarData(soa::Join<aod::Collisions, aod::EvSels, aod::PVMults> const& collisions,
                              aod::HfCand2ProngWPid const& candsJpsi,
                              aod::TrackAssoc const& trackIndices,
                              TracksPidWithSel const& tracks,

@@ -567,7 +567,9 @@ DECLARE_SOA_TABLE(FDHfCharm3Prong, "AOD", "FDHFCHARM3PRONG", //! table to store 
                   fdhf::Charge,
                   fdhf::BDTBkg,
                   fdhf::BDTPrompt,
-                  fdhf::BDTFD);
+                  fdhf::BDTFD,
+                  fdhf::FlagMc,
+                  fdhf::OriginMcRec);
 
 DECLARE_SOA_TABLE(FDHfCharm2Prong, "AOD", "FDHFCHARM2PRONG", //! table to store results for HF femtoscopy
                   fdhf::GIndexCol,
@@ -581,7 +583,9 @@ DECLARE_SOA_TABLE(FDHfCharm2Prong, "AOD", "FDHFCHARM2PRONG", //! table to store 
                   fdhf::Charge,
                   fdhf::BDTBkg,
                   fdhf::BDTPrompt,
-                  fdhf::BDTFD);
+                  fdhf::BDTFD,
+                  fdhf::FlagMc,
+                  fdhf::OriginMcRec);
 
 DECLARE_SOA_TABLE(FDHfCharmDstar, "AOD", "FDHFCHARMDSTAR", //! table to store results for HF femtoscopy
                   fdhf::GIndexCol,
@@ -597,7 +601,9 @@ DECLARE_SOA_TABLE(FDHfCharmDstar, "AOD", "FDHFCHARMDSTAR", //! table to store re
                   fdhf::Charge,
                   fdhf::BDTBkg,
                   fdhf::BDTPrompt,
-                  fdhf::BDTFD);
+                  fdhf::BDTFD,
+                  fdhf::FlagMc,
+                  fdhf::OriginMcRec);
 
 DECLARE_SOA_TABLE(FDHfTrk, "AOD", "FDHFTRK", //! table to store results for HF femtoscopy
                   fdhf::GIndexCol,
@@ -737,6 +743,8 @@ enum ParticleOriginMCTruth {
   kSecondaryDaughterXistar0,     //! Daughter from a Xi*^0 decay
   kSecondaryDaughterXistarMinus, //! Daughter from a Xi*^- decay
   kElse,                         //! none of the above; (NOTE: used to catch bugs. will be removed once MC usage is properly validated)
+  kSecondaryFromHF,              //! Kaon from a charm- or beauty-hadron decay chain
+  kSecondaryFromLF,              //! Kaon from a light-flavour decay without a heavy-flavour ancestor
   kNOriginMCTruthTypes
 };
 
@@ -756,7 +764,9 @@ static constexpr std::string_view ParticleOriginMCTruthName[kNOriginMCTruthTypes
   "_SecondaryDaughterOmegaMinus",
   "_SecondaryDaughterXistar0",
   "_SecondaryDaughterXistarMinus",
-  "_Else"};
+  "_Else",
+  "_SecondaryFromHF",
+  "_SecondaryFromLF"};
 
 /// Distinguished between reconstructed and truth
 enum MCType {

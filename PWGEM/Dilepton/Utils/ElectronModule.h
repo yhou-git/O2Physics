@@ -22,6 +22,7 @@
 #include "PWGEM/Dilepton/Utils/PairUtilities.h"
 #include "PWGEM/Dilepton/Utils/SemiCharmTag.h"
 
+#include "Common/Core/PID/PIDTOFParamService.h"
 #include "Common/Core/RecoDecay.h"
 #include "Common/Core/trackUtilities.h"
 #include "Tools/ML/MlResponse.h"
@@ -37,7 +38,6 @@
 #include <Framework/HistogramRegistry.h>
 #include <Framework/HistogramSpec.h>
 #include <Framework/Logger.h>
-#include <PID/PIDTOFParamService.h>
 #include <ReconstructionDataFormats/DCA.h>
 #include <ReconstructionDataFormats/PID.h>
 
@@ -1600,12 +1600,12 @@ class ElectronModule
           registry.fill(HIST("Prefilter/Pair/hMvsPhiV"), phiv, v12.M());
 
           if (v12.M() < fElectronPFCut.slope * phiv + fElectronPFCut.intercept) {
-            pfb |= (uint8_t(1) << static_cast<int>(o2::aod::pwgem::dilepton::utils::pairutil::DileptonPrefilterBit::kElFromPC));
+            pfb |= (static_cast<uint8_t>(1) << static_cast<int>(o2::aod::pwgem::dilepton::utils::pairutil::DileptonPrefilterBit::kElFromPC));
           }
 
           for (int i = 0; i < static_cast<int>(max_mee_vec.size()); i++) {
             if (v12.M() < max_mee_vec.at(i)) {
-              pfb |= (uint8_t(1) << (static_cast<int>(o2::aod::pwgem::dilepton::utils::pairutil::DileptonPrefilterBit::kElFromPi0_20MeV) + i));
+              pfb |= (static_cast<uint8_t>(1) << (static_cast<int>(o2::aod::pwgem::dilepton::utils::pairutil::DileptonPrefilterBit::kElFromPi0_20MeV) + i));
             }
           } // end of mee loop
 
